@@ -22,6 +22,7 @@ export function Race({ state, run, now, onRun, onStale }: RaceProps) {
   const code = state.room.code;
   const [article, setArticle] = useState<Article | null>(null);
   const [navigating, setNavigating] = useState(false);
+  const [pageArrived, setPageArrived] = useState(false); // new page on screen while the server still checks
   const [error, setError] = useState<string | null>(null);
   const requested = useRef<string | null>(null);
 
@@ -51,16 +52,30 @@ export function Race({ state, run, now, onRun, onStale }: RaceProps) {
   async function move(body: { via: string } | { back: true }) {
     if (navigating || locked || !run.current) return;
     setNavigating(true);
+    setPageArrived(false);
     setError(null);
+    const shownBefore = article;
+    let failed = false;
     try {
-      // Load the page while the server checks the click.
+      // Load the page while the server checks the click, and show it the
+      // moment it's here rather than waiting for the server's answer.
       const page = "via" in body ? fetchArticle(body.via).catch(() => null) : null;
+      page?.then((p) => {
+        if (p && !failed) {
+          setArticle(p);
+          setPageArrived(true);
+        }
+      });
       const next = await apiCall<RunView>(`/api/rooms/${code}/move`, { from: run.current, ...body });
       const shown = (await page) ?? (next.current ? await fetchArticle(next.current) : null);
       requested.current = next.current;
       if (shown) setArticle(shown);
       onRun(next);
     } catch (e) {
+      // The server said no: put back the page the player was actually on.
+      failed = true;
+      setPageArrived(false);
+      if (shownBefore) setArticle(shownBefore);
       setError(e instanceof ApiError ? e.message : "Couldn't load that article. Pick another link.");
       onStale();
     } finally {
@@ -145,7 +160,7 @@ export function Race({ state, run, now, onRun, onStale }: RaceProps) {
       <ArticleView
         title={article?.title ?? run.current ?? ""}
         html={article?.html ?? ""}
-        busy={navigating || locked}
+        busy={(navigating && !pageArrived) || locked}
         error={timeLeft === 0 ? "Time's up. Scoring the round..." : error}
         onLink={(title) => move({ via: title })}
       />

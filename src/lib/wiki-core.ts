@@ -250,6 +250,27 @@ export function createWiki(toBody: (rawHtml: string) => HTMLElement, cacheSize =
     while (cache.size > cacheSize) cache.delete(cache.keys().next().value as string);
   }
 
+  // Raw page downloads, kept separately from processed articles so a prefetch
+  // costs only network: the parsing happens on the click that needs it.
+  const raws = new Map<string, Promise<string>>();
+  const RAW_KEEP = 80;
+
+  function fetchRaw(title: string, priority: "high" | "low" = "high"): Promise<string> {
+    const key = normTitle(title);
+    const pending = raws.get(key);
+    if (pending) return pending;
+    const init = { headers: IS_SERVER ? SERVER_HEADERS : undefined, priority } as RequestInit;
+    const p = fetch(REST_HTML + encodeURIComponent(key.replace(/ /g, "_")), init).then((res) => {
+      if (res.status === 404) throw new Error(`No such article: ${title}`);
+      if (!res.ok) throw new Error(`Wikipedia error ${res.status}`);
+      return res.text();
+    });
+    p.catch(() => raws.delete(key)); // a failed download can be retried
+    raws.set(key, p);
+    while (raws.size > RAW_KEEP) raws.delete(raws.keys().next().value as string);
+    return p;
+  }
+
   function fetchArticle(title: string): Promise<Article> {
     const key = normTitle(title);
     const hit = cache.get(key);
@@ -261,23 +282,47 @@ export function createWiki(toBody: (rawHtml: string) => HTMLElement, cacheSize =
     return p;
   }
 
-  /** Start loading an article the player is about to click; errors are left for the click. */
-  function prefetchArticle(title: string): void {
-    fetchArticle(title).catch(() => {});
-  }
-
   async function loadArticle(title: string, key: string): Promise<Article> {
-    const res = await fetch(REST_HTML + encodeURIComponent(title.replace(/ /g, "_")), {
-      headers: IS_SERVER ? SERVER_HEADERS : undefined,
-    });
-    if (res.status === 404) throw new Error(`No such article: ${title}`);
-    if (!res.ok) throw new Error(`Wikipedia error ${res.status}`);
-    const raw = await res.text();
+    const raw = await fetchRaw(title);
+    raws.delete(key); // processed from here on; the article cache takes over
     const { html, linkCount, links } = cleanArticle(toBody(raw));
-    const article: Article = { title: restTitle(raw) ?? normTitle(title), html, linkCount, links };
+    const article: Article = { title: restTitle(raw) ?? key, html, linkCount, links };
     remember(key, article);
     remember(normTitle(article.title), article);
     return article;
+  }
+
+  /** Start downloading an article the player is about to click (hover, touch). */
+  function prefetchArticle(title: string): void {
+    if (cache.has(normTitle(title))) return;
+    fetchRaw(title).catch(() => {});
+  }
+
+  // Background queue for the links a player is likely to click next. A new
+  // page replaces the queue, and only a few downloads run at once so they
+  // never crowd out the click the player actually makes.
+  let queue: string[] = [];
+  let running = 0;
+  const PREFETCH_PARALLEL = 6;
+
+  function pump() {
+    while (running < PREFETCH_PARALLEL && queue.length) {
+      const title = queue.shift()!;
+      if (cache.has(normTitle(title)) || raws.has(normTitle(title))) continue;
+      running++;
+      fetchRaw(title, "low")
+        .catch(() => {})
+        .finally(() => {
+          running--;
+          pump();
+        });
+    }
+  }
+
+  /** Queue background downloads of likely next clicks, replacing any older queue. */
+  function prefetchLinks(titles: string[]): void {
+    queue = [...titles];
+    pump();
   }
 
   // Random mainspace article that makes for a playable start: not a list or
@@ -326,5 +371,5 @@ export function createWiki(toBody: (rawHtml: string) => HTMLElement, cacheSize =
     getArticle: fetchArticle,
   };
 
-  return { fetchArticle, prefetchArticle, pickStart, closeDeps };
+  return { fetchArticle, prefetchArticle, prefetchLinks, pickStart, closeDeps };
 }

@@ -366,17 +366,16 @@ export async function move(
     const via = typeof body.via === "string" ? body.via.trim() : "";
     if (!via || via.length > 300 || via.includes("|")) throw new HttpError(400, "Bad link.");
     // Wikipedia's link table first; fall back to the rendered page, which is
-    // what the player actually saw.
-    const linked =
-      (await apiHasLink(top, via).catch(() => false)) ||
-      (await serverWiki.fetchArticle(top)).links.includes(normTitle(via));
+    // what the player actually saw. The link check and the title lookup don't
+    // depend on each other, so they run together.
+    const [inLinkTable, canonical] = await Promise.all([
+      apiHasLink(top, via).catch(() => false),
+      canonicalTitle(via).catch(() => null),
+    ]);
+    const linked = inLinkTable || (await serverWiki.fetchArticle(top)).links.includes(normTitle(via));
     if (!linked) throw new HttpError(400, "That link isn't on this page.");
-    let title: string;
-    try {
-      title = await canonicalTitle(via);
-    } catch {
-      throw new HttpError(400, "That article doesn't exist.");
-    }
+    if (!canonical) throw new HttpError(400, "That article doesn't exist.");
+    const title = canonical;
     stack = [...run.stack, title];
     step = { title, via };
   }
