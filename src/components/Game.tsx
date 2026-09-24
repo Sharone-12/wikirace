@@ -3,9 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TopBar } from "@/components/Brand";
-import { HeroScene } from "@/components/Doodles";
 import { ArticleView, RaceHeader } from "@/components/RaceHeader";
-import { RouteMap } from "@/components/RouteLine";
+import { RouteMap, RouteTicker } from "@/components/RouteLine";
 import { pickTarget } from "@/lib/targets";
 import {
   describeCloseness,
@@ -177,24 +176,25 @@ export default function Game() {
   if (phase === "name" || phase === "loading") {
     const loading = phase === "loading";
     return (
-      <main className="flex w-full flex-1 flex-col">
-        <div className="px-5 pt-5 sm:px-8 sm:pt-6">
+      <main className="landing flex min-h-0 w-full flex-1 flex-col">
+        <div className="px-5 pt-4 sm:px-8 sm:pt-5">
           <TopBar />
         </div>
-        <div className="mx-auto mt-4 w-full max-w-6xl px-4 sm:px-8">
-          <HeroScene running={loading} />
-        </div>
 
-        <div className="mx-auto flex w-full max-w-2xl flex-col items-center px-5 pb-12 pt-8 text-center sm:px-8">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-5 text-center sm:px-8">
           <h1 className="display text-4xl sm:text-6xl">
             From here to there,
             <br />
             one link at a time.
           </h1>
-          <p className="mt-4 max-w-[46ch] text-lg text-muted">
-            Start on a random Wikipedia article. Reach the target using only the links on the page,
-            in {TIME_LIMIT / 60} minutes.
+          <p className="mt-4 max-w-[48ch] text-muted">
+            Start on a random Wikipedia article. Reach the target using only its links, in{" "}
+            {TIME_LIMIT / 60} minutes.
           </p>
+
+          <div className="mt-10 flex w-full justify-center">
+            <RouteTicker />
+          </div>
 
           <form
             onSubmit={(e) => {
@@ -206,39 +206,33 @@ export default function Game() {
               }
               startRound();
             }}
-            className="mt-8 flex w-full flex-col items-center gap-4"
+            className="mt-10 flex w-full max-w-md flex-col gap-3"
           >
-            <label className="flex w-full max-w-sm flex-col gap-1.5 text-left">
-              <span className="kicker text-muted">Your name</span>
-              <input
-                ref={nameRef}
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  setError(null);
-                }}
-                maxLength={20}
-                autoComplete="nickname"
-                disabled={loading}
-                className="field text-center text-lg"
-              />
-            </label>
-            <div className="grid w-full max-w-md grid-cols-2 gap-3">
-              <button type="submit" disabled={loading} className="btn-ink py-4 text-lg">
-                {loading ? "Loading..." : "Solo →"}
+            <input
+              ref={nameRef}
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setError(null);
+              }}
+              maxLength={20}
+              autoComplete="nickname"
+              disabled={loading}
+              placeholder="Your name"
+              aria-label="Your name"
+              className="field text-center text-lg"
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <button type="submit" disabled={loading} className="btn-ink text-base">
+                {loading ? "Loading..." : "Solo"}
               </button>
-              <Link href="/play" className="btn-line py-4 text-lg">
-                Multiplayer ↗
+              <Link href="/play" className="btn-line py-3 text-base">
+                Multiplayer
               </Link>
             </div>
           </form>
-          {error && (
-            <p role="alert" className="frame mt-4 bg-stop px-3.5 py-2.5 text-sm font-semibold text-white">
-              {error}
-            </p>
-          )}
-          <p className="kicker mt-6 text-muted">
-            Going back costs a click · fewer clicks and more time left score higher
+          <p role="alert" className="kicker mt-3 h-4 text-ink">
+            {error}
           </p>
         </div>
       </main>

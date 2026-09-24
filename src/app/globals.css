@@ -79,6 +79,26 @@ body {
   }
 }
 
+/* The landing is one fixed screen: the frame fills the window and nothing scrolls. */
+body:has(.landing) {
+  overflow: hidden;
+}
+.site:has(.landing) {
+  position: fixed;
+  inset: 10px;
+  margin: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+@media (min-width: 640px) {
+  .site:has(.landing) {
+    inset: 20px;
+  }
+}
+.site:has(.landing) > footer {
+  display: none;
+}
+
 /* A framed surface: the ink outline everything in this UI sits in. */
 @utility frame {
   border: 2px solid var(--line);
@@ -205,20 +225,32 @@ body {
   border-radius: 5px;
 }
 
-/* One deliberate motion: the dashed route in the landscape marches toward
-   the flag while a round loads. */
-@keyframes march {
+/* Landing animation: the cursor presses down and a ring spreads from the click. */
+@keyframes click-press {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(0.78);
+  }
+}
+.click-press {
+  transform-origin: 3px 3px;
+  animation: click-press 0.28s ease-out;
+}
+@keyframes click-ripple {
+  from {
+    transform: translate(-50%, -50%) scale(0.6);
+    opacity: 1;
+  }
   to {
-    stroke-dashoffset: -48;
+    transform: translate(-50%, -50%) scale(2.8);
+    opacity: 0;
   }
 }
-.route-run {
-  animation: march 0.8s linear infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .route-run {
-    animation: none;
-  }
+.click-ripple {
+  animation: click-ripple 0.5s ease-out forwards;
 }
 
 /* Time bar when it's nearly out: hatched instead of solid, since there's no red. */
