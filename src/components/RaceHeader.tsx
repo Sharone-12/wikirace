@@ -25,9 +25,9 @@ export function RaceHeader(p: RaceHeaderProps) {
   const low = p.timeLeft <= 30;
 
   return (
-    <header className="sticky top-0 z-10 border-b border-line bg-bg/95 backdrop-blur">
+    <header className="sticky top-0 z-10 border-b-[1.5px] border-ink bg-bg/95 backdrop-blur">
       <div
-        className="h-1 bg-line"
+        className="h-1.5 bg-hair"
         role="progressbar"
         aria-label="Time left"
         aria-valuemin={0}
@@ -35,7 +35,7 @@ export function RaceHeader(p: RaceHeaderProps) {
         aria-valuenow={p.timeLeft}
       >
         <div
-          className={`h-full transition-[width] duration-300 ease-linear ${low ? "bg-stop" : "bg-signal"}`}
+          className={`h-full transition-[width] duration-300 ease-linear ${low ? "bg-stop" : "bg-ink"}`}
           style={{ width: `${(p.timeLeft / p.timeLimit) * 100}%` }}
         />
       </div>
@@ -45,28 +45,28 @@ export function RaceHeader(p: RaceHeaderProps) {
           <button
             onClick={() => setShowExtract((v) => !v)}
             aria-expanded={showExtract}
-            className="min-w-0 flex-1 rounded-xl bg-sun px-3.5 py-2 text-left text-sun-ink"
+            className="frame lift min-w-0 flex-1 rounded-2xl bg-sun px-3.5 py-2 text-left text-sun-ink"
             title="Tap to see what the target is"
           >
-            <div className="text-xs font-medium opacity-70">Get to</div>
-            <div className="truncate text-lg font-bold leading-tight">{p.target}</div>
+            <div className="kicker">Get to ↗</div>
+            <div className="truncate text-xl font-black leading-tight tracking-tight">{p.target}</div>
           </button>
           <div className="text-right">
-            <div className="text-3xl font-extrabold leading-none tabular-nums">{p.clicks}</div>
-            <div className="mt-0.5 text-xs text-muted">{p.clicks === 1 ? "click" : "clicks"}</div>
+            <div className="text-[32px] font-black leading-none tracking-tighter tabular-nums">{p.clicks}</div>
+            <div className="kicker mt-1 text-muted">{p.clicks === 1 ? "click" : "clicks"}</div>
           </div>
           <div className="text-right">
             <div
-              className={`text-3xl font-extrabold leading-none tabular-nums ${low ? "text-stop" : ""}`}
+              className={`text-[32px] font-black leading-none tracking-tighter tabular-nums ${low ? "text-stop" : ""}`}
             >
               {mm}:{ss}
             </div>
-            <div className="mt-0.5 text-xs text-muted">left</div>
+            <div className="kicker mt-1 text-muted">left</div>
           </div>
         </div>
 
         {showExtract && p.targetExtract && (
-          <p className="mt-2 rounded-lg bg-surface px-3 py-2 text-sm text-muted ring-1 ring-line">
+          <p className="frame mt-2 rounded-2xl bg-surface px-3.5 py-2.5 text-sm leading-relaxed">
             {p.targetExtract}
           </p>
         )}
@@ -75,7 +75,7 @@ export function RaceHeader(p: RaceHeaderProps) {
           <button
             onClick={p.onBack}
             disabled={!p.canGoBack || p.busy}
-            className="shrink-0 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium disabled:opacity-40"
+            className="btn-line shrink-0 text-sm"
             title="Going back costs a click"
           >
             Back (+1 click)
@@ -83,7 +83,7 @@ export function RaceHeader(p: RaceHeaderProps) {
           <Trail path={p.path} target={p.target} />
           <button
             onClick={p.onGiveUp}
-            className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-stop ring-1 ring-stop/40"
+            className="btn-line shrink-0 text-sm text-stop hover:!bg-stop hover:!text-white"
           >
             Give up
           </button>
@@ -107,11 +107,11 @@ export function ArticleView({ title, html, busy, error, onLink }: ArticleViewPro
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6" aria-busy={busy}>
       {error && (
-        <p role="alert" className="mb-4 rounded-lg bg-stop/10 px-3 py-2 text-sm text-stop">
+        <p role="alert" className="frame mb-4 rounded-2xl bg-stop px-3.5 py-2.5 text-sm font-semibold text-white">
           {error}
         </p>
       )}
-      <h1 className="mb-5 text-4xl font-extrabold leading-tight tracking-tight">{title}</h1>
+      <h1 className="display mb-6 text-4xl sm:text-5xl">{title}</h1>
       <div
         onClick={(e) => {
           const a = (e.target as HTMLElement).closest("a");

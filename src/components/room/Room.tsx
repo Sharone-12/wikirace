@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { newerRun } from "@/components/room/progress";
 import { Race } from "@/components/room/Race";
-import { Lobby, Results, Waiting } from "@/components/room/views";
+import { Logo } from "@/components/Brand";
+import { Lobby, Results, RoomShell, Waiting } from "@/components/room/views";
 import { ApiError, apiCall } from "@/lib/client/api";
 import { ensureIdentity, loadIdentity, type Identity } from "@/lib/client/identity";
 import { realtime } from "@/lib/client/realtime";
@@ -218,8 +219,9 @@ export default function Room({ code: rawCode }: { code: string }) {
 
   if (phase === "loading") {
     return (
-      <main className="flex flex-1 items-center justify-center px-6 text-muted">
-        Joining room {code}...
+      <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6">
+        <Logo size={40} />
+        <p className="kicker text-muted">Joining room {code}...</p>
       </main>
     );
   }
@@ -230,15 +232,15 @@ export default function Room({ code: rawCode }: { code: string }) {
 
   if (phase === "error" || !state) {
     return (
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-6 py-14">
-        <h1 className="text-4xl font-extrabold tracking-tight">Can&apos;t open room {code}</h1>
-        <p role="alert" className="mt-4 text-lg text-muted">
+      <RoomShell code={code}>
+        <h1 className="display mt-12 text-5xl">Can&apos;t open this room.</h1>
+        <p role="alert" className="frame mt-6 rounded-2xl bg-stop px-4 py-3 font-semibold text-white">
           {fatal ?? "Something went wrong."}
         </p>
-        <Link href="/play" className="mt-8 font-semibold text-signal underline">
-          Create or join another room
+        <Link href="/play" className="btn-ink mt-8 text-base">
+          Create or join another room →
         </Link>
-      </main>
+      </RoomShell>
     );
   }
 
@@ -291,12 +293,15 @@ function NameGate({ code, onReady }: { code: string; onReady: (id: Identity) => 
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-6 py-14">
-      <p className="text-sm font-medium text-muted">You&apos;re invited to room</p>
-      <h1 className="mt-1 text-6xl font-extrabold tracking-[0.15em]">{code}</h1>
-      <form onSubmit={submit} className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-end">
-        <label className="flex flex-1 flex-col gap-1.5 text-sm font-medium">
-          Your name
+    <RoomShell code={code}>
+      <p className="kicker mt-12 text-muted">You&apos;re invited</p>
+      <h1 className="display mt-2 text-5xl sm:text-6xl">Join the race.</h1>
+      <form
+        onSubmit={submit}
+        className="frame mt-8 flex flex-col gap-3 rounded-[22px] bg-surface p-4 sm:flex-row sm:items-end"
+      >
+        <label className="flex flex-1 flex-col gap-1.5">
+          <span className="kicker text-muted">Your name</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -304,22 +309,18 @@ function NameGate({ code, onReady }: { code: string; onReady: (id: Identity) => 
             autoFocus
             autoComplete="nickname"
             disabled={saving}
-            className="rounded-xl border-2 border-line bg-surface px-4 py-3 text-lg font-normal outline-none transition-colors focus:border-signal"
+            className="field text-lg"
           />
         </label>
-        <button
-          type="submit"
-          disabled={!name.trim() || saving}
-          className="rounded-xl bg-signal px-7 py-3.5 text-lg font-bold text-signal-ink transition-transform active:scale-[0.98] disabled:opacity-50"
-        >
-          {saving ? "Joining..." : "Join"}
+        <button type="submit" disabled={!name.trim() || saving} className="btn-ink text-base">
+          {saving ? "Joining..." : "Join →"}
         </button>
       </form>
       {error && (
-        <p role="alert" className="mt-4 rounded-lg bg-stop/10 px-3 py-2 text-sm text-stop">
+        <p role="alert" className="frame mt-3 rounded-2xl bg-stop px-3.5 py-2.5 text-sm font-semibold text-white">
           {error}
         </p>
       )}
-    </main>
+    </RoomShell>
   );
 }

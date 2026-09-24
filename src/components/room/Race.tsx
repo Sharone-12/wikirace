@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArticleView, RaceHeader } from "@/components/RaceHeader";
 import { ProgressChips } from "@/components/room/progress";
+import { RoomShell } from "@/components/room/views";
 import { ApiError, apiCall } from "@/lib/client/api";
 import type { RoomState, RunView } from "@/lib/room-types";
 import { fetchArticle, type Article } from "@/lib/wiki";
@@ -90,26 +91,38 @@ export function Race({ state, run, now, onRun, onStale }: RaceProps) {
 
   if (countdown > 0) {
     return (
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-6 py-14 text-center">
-        <p className="text-sm font-medium text-muted">
-          Round {round.number} of {state.room.roundsTotal}
-        </p>
-        <div className="mx-auto mt-4 rounded-2xl bg-sun px-6 py-4 text-sun-ink">
-          <div className="text-sm font-medium opacity-70">Get to</div>
-          <div className="text-3xl font-extrabold leading-tight">{round.target}</div>
+      <RoomShell code={code}>
+        <div className="flex flex-col items-center py-12 text-center">
+          <p className="kicker text-muted">
+            Round {round.number} of {state.room.roundsTotal} · get ready
+          </p>
+          <div className="mt-8 grid w-full gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+            <div className="frame rounded-2xl bg-surface p-4 text-left">
+              <div className="kicker text-muted">Start</div>
+              <div className="mt-1 text-xl font-extrabold leading-tight tracking-tight">{round.start}</div>
+            </div>
+            <span className="text-2xl font-black" aria-hidden="true">
+              →
+            </span>
+            <div className="frame rounded-2xl bg-sun p-4 text-left">
+              <div className="kicker">Get to</div>
+              <div className="mt-1 text-xl font-black leading-tight tracking-tight">{round.target}</div>
+            </div>
+          </div>
+          {round.targetExtract && (
+            <p className="mt-5 max-w-[56ch] border-l-[3px] border-ink pl-3.5 text-left text-sm leading-relaxed text-muted">
+              {round.targetExtract}
+            </p>
+          )}
+          <div
+            className="frame mt-10 grid size-40 place-items-center rounded-full bg-ink text-8xl font-black tabular-nums text-white"
+            role="timer"
+            aria-live="assertive"
+          >
+            {countdown}
+          </div>
         </div>
-        {round.targetExtract && (
-          <p className="mx-auto mt-4 max-w-[52ch] text-muted">{round.targetExtract}</p>
-        )}
-        <p className="mt-6 text-muted">Starting from {round.start}</p>
-        <div
-          className="mt-8 text-8xl font-extrabold tabular-nums"
-          role="timer"
-          aria-live="assertive"
-        >
-          {countdown}
-        </div>
-      </main>
+      </RoomShell>
     );
   }
 

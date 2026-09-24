@@ -1,31 +1,24 @@
 @import "tailwindcss";
 
+/* Paper, ink, and flat colour blocks: the mulenet design language. Every
+   surface is framed with a 1.5px ink line; colour is used as solid fills
+   with ink text on top, never as gradients. */
 :root {
-  --bg: #f6f7f9;
-  --surface: #ffffff;
-  --ink: #101828;
-  --muted: #667085;
-  --line: #d0d5dd;
-  --signal: #2f5bff;
-  --signal-ink: #ffffff;
-  --sun: #ffc93c;
-  --sun-ink: #101828;
-  --go: #12a150;
-  --stop: #e5484d;
-}
+  --bg: #f0ebe5; /* paper */
+  --surface: #fbf8f5; /* card */
+  --ink: #0a0a0a;
+  --muted: #6b655e;
+  --line: #0a0a0a;
+  --hair: rgba(10, 10, 10, 0.16); /* quiet separators and tracks */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0c111d;
-    --surface: #131a2a;
-    --ink: #f2f4f7;
-    --muted: #98a2b3;
-    --line: #2a3348;
-    --signal: #7a97ff;
-    --signal-ink: #0c111d;
-    --go: #34c77b;
-    --stop: #ff6b6b;
-  }
+  --signal: #1668e3; /* blue */
+  --signal-ink: #ffffff;
+  --sun: #ffb400; /* amber */
+  --sun-ink: #0a0a0a;
+  --go: #00a94f; /* green */
+  --stop: #e8412f; /* red */
+  --orange: #ff5b22;
+  --purple: #a855f7;
 }
 
 @theme inline {
@@ -34,12 +27,15 @@
   --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-line: var(--line);
+  --color-hair: var(--hair);
   --color-signal: var(--signal);
   --color-signal-ink: var(--signal-ink);
   --color-sun: var(--sun);
   --color-sun-ink: var(--sun-ink);
   --color-go: var(--go);
   --color-stop: var(--stop);
+  --color-orange: var(--orange);
+  --color-purple: var(--purple);
   --font-sans: var(--font-display);
   --font-serif: var(--font-serif);
 }
@@ -48,13 +44,122 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-display), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 @layer base {
   :focus-visible {
-    outline: 3px solid var(--signal);
+    outline: 2.5px solid var(--ink);
     outline-offset: 2px;
   }
+  ::selection {
+    background: var(--sun);
+    color: var(--ink);
+  }
+}
+
+/* A framed surface: the ink outline everything in this UI sits in. */
+@utility frame {
+  border: 1.5px solid var(--line);
+}
+
+/* Small uppercase label above a value or section. */
+@utility kicker {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+/* Heavy display type with the tight tracking of the mulenet headings. */
+@utility display {
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+}
+
+/* Primary action: a solid ink pill. */
+@utility btn-ink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-weight: 700;
+  padding: 0.85rem 1.6rem;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+  }
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+}
+
+/* Secondary action: an outlined pill that fills with ink on hover. */
+@utility btn-line {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: transparent;
+  font-weight: 600;
+  padding: 0.4rem 0.9rem;
+  transition: background 0.15s ease, color 0.15s ease;
+  &:hover:not(:disabled) {
+    background: var(--ink);
+    color: #fff;
+  }
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+}
+
+/* Colour-block card that lifts on hover, like the mulenet nav cards. */
+@utility lift {
+  transition: transform 0.15s ease;
+  &:hover {
+    transform: translateY(-2px);
+  }
+}
+
+/* Inputs sit on paper inside an ink frame. */
+@utility field {
+  width: 100%;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--ink);
+  padding: 0.75rem 1.1rem;
+  font-size: 1rem;
+  outline: none;
+  &::placeholder {
+    color: var(--muted);
+  }
+  &:focus {
+    box-shadow: 0 0 0 3px var(--sun);
+  }
+  &:disabled {
+    opacity: 0.6;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(10, 10, 10, 0.2);
+  border-radius: 5px;
 }
 
 /* One deliberate motion: a train dot running the line while a round loads. */
@@ -73,8 +178,8 @@ body {
   height: 14px;
   margin: -7px 0 0 -7px;
   border-radius: 9999px;
-  background: var(--signal);
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--signal) 25%, transparent);
+  background: var(--ink);
+  box-shadow: 0 0 0 4px var(--sun);
   animation: run-line 1.6s cubic-bezier(0.6, 0, 0.4, 1) infinite;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -102,12 +207,13 @@ body {
   color: var(--signal);
   cursor: pointer;
   text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--signal) 35%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--signal) 40%, transparent);
+  text-decoration-thickness: 1.5px;
   text-underline-offset: 3px;
 }
 .wiki-content a[data-title]:hover {
   text-decoration-color: var(--signal);
-  background: color-mix(in srgb, var(--signal) 10%, transparent);
+  background: color-mix(in srgb, var(--sun) 45%, transparent);
 }
 .wiki-content p {
   margin: 0.7em 0;
@@ -117,16 +223,17 @@ body {
 .wiki-content .mw-heading2 {
   font-family: var(--font-display), sans-serif;
   font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-weight: 800;
+  letter-spacing: -0.03em;
   margin: 1.6em 0 0.4em;
   padding-bottom: 0.25em;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1.5px solid var(--line);
 }
 .wiki-content h3 {
   font-family: var(--font-display), sans-serif;
   font-size: 1.2rem;
-  font-weight: 650;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   margin: 1.2em 0 0.3em;
 }
 .wiki-content ul {
@@ -143,7 +250,7 @@ body {
 .wiki-content img {
   max-width: 100%;
   height: auto;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 .wiki-content figure {
   margin: 0.8em 0;
@@ -166,8 +273,8 @@ body {
 .wiki-content .infobox {
   width: 22em;
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 16px;
   font-family: var(--font-display), sans-serif;
   font-size: 0.85rem;
   line-height: 1.45;
@@ -182,7 +289,7 @@ body {
   vertical-align: top;
 }
 .wiki-content .wikitable {
-  border: 1px solid var(--line);
+  border: 1.5px solid var(--line);
   display: block;
   overflow-x: auto;
   max-width: 100%;
@@ -190,7 +297,7 @@ body {
 }
 .wiki-content .wikitable td,
 .wiki-content .wikitable th {
-  border: 1px solid var(--line);
+  border: 1px solid var(--hair);
 }
 .wiki-content .mw-heading {
   clear: both;
@@ -207,16 +314,6 @@ body {
   float: left;
   margin-right: 1em;
 }
-/* Wikipedia math and diagrams are dark-on-transparent images. */
-@media (prefers-color-scheme: dark) {
-  .wiki-content img {
-    background: #ffffff;
-  }
-  .wiki-content .infobox img {
-    background: transparent;
-  }
-}
-
 /* Phones: no floats, infobox goes full width. */
 @media (max-width: 640px) {
   .wiki-content {

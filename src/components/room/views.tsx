@@ -1,24 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import { Brand } from "@/components/Brand";
 import { RouteMap } from "@/components/RouteLine";
 import {
-  nameOf,
-  resultOrder,
-  STATUS_TEXT,
-  Standings,
   liveOrder,
+  nameOf,
+  Panel,
+  resultOrder,
+  Standings,
+  STATUS_TEXT,
+  StatusTag,
 } from "@/components/room/progress";
 import type { RoomState, RunView } from "@/lib/room-types";
-import { describeCloseness } from "@/lib/scoring";
-
-const btn =
-  "rounded-xl bg-signal px-7 py-3.5 text-lg font-bold text-signal-ink transition-transform active:scale-[0.98] disabled:opacity-50";
 
 function Notice({ text }: { text: string | null }) {
   if (!text) return null;
   return (
-    <p role="alert" className="mt-4 rounded-lg bg-stop/10 px-3 py-2 text-sm text-stop">
+    <p role="alert" className="frame mt-3 rounded-2xl bg-stop px-3.5 py-2.5 text-sm font-semibold text-white">
       {text}
     </p>
   );
@@ -26,6 +25,32 @@ function Notice({ text }: { text: string | null }) {
 
 function hostName(state: RoomState) {
   return state.players.find((p) => p.id === state.room.hostId)?.name ?? "the host";
+}
+
+/** Page frame shared by the room screens: brand on the left, room code on the right. */
+export function RoomShell({ code, children }: { code: string; children: React.ReactNode }) {
+  return (
+    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8">
+      <div className="flex items-start justify-between gap-4">
+        <Brand tagline="multiplayer race" />
+        <span className="kicker frame rounded-full bg-surface px-3 py-1.5 tracking-[0.2em]">
+          Room {code}
+        </span>
+      </div>
+      {children}
+    </main>
+  );
+}
+
+/** Big number block, the mulenet stat card. */
+function Stat({ k, v, u, color }: { k: string; v: string | number; u: string; color: string }) {
+  return (
+    <div className={`frame flex min-h-24 flex-col justify-between rounded-2xl px-4 pb-3.5 pt-3 ${color}`}>
+      <span className="kicker">{k}</span>
+      <span className="text-[32px] font-black leading-none tracking-tighter tabular-nums">{v}</span>
+      <span className="text-[11px] font-semibold opacity-75">{u}</span>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------- lobby
@@ -54,38 +79,48 @@ export function Lobby({ state, online, busy, notice, onStart }: LobbyProps) {
   }
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-12">
-      <p className="text-sm font-medium text-muted">Room code</p>
-      <div className="mt-1 flex flex-wrap items-center gap-4">
-        <h1 className="text-6xl font-extrabold tracking-[0.15em] sm:text-7xl">{code}</h1>
-        <button
-          onClick={copyLink}
-          className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium"
-        >
-          {copied ? "Link copied" : "Copy invite link"}
+    <RoomShell code={code}>
+      <p className="kicker mt-10 text-muted">Room code · share it or send the link</p>
+      <div className="mt-3 flex flex-wrap items-center gap-4">
+        <div className="flex gap-2" aria-label={`Room code ${code.split("").join(" ")}`}>
+          {code.split("").map((ch, i) => (
+            <span
+              key={i}
+              aria-hidden="true"
+              className="frame grid h-20 w-16 place-items-center rounded-2xl bg-surface text-5xl font-black tracking-tight sm:h-24 sm:w-20 sm:text-6xl"
+            >
+              {ch}
+            </span>
+          ))}
+        </div>
+        <button onClick={copyLink} className="btn-line px-4 py-2.5 text-sm">
+          {copied ? "Link copied ✓" : "Copy invite link ↗"}
         </button>
       </div>
-      <p className="mt-4 text-muted">
-        {roundsTotal} round{roundsTotal === 1 ? "" : "s"}, {timeLimit / 60} minute
-        {timeLimit === 60 ? "" : "s"} each. Everyone starts on the same article.
-      </p>
 
-      <h2 className="mb-3 mt-10 text-xl font-bold">
-        Players <span className="text-muted">({state.players.length})</span>
-      </h2>
-      <Standings state={state} online={online} />
+      <div className="mt-8 grid grid-cols-3 gap-3">
+        <Stat k="Rounds" v={roundsTotal} u="then a winner" color="bg-signal text-white" />
+        <Stat k="Minutes" v={timeLimit / 60} u="per round" color="bg-sun" />
+        <Stat k="Players" v={state.players.length} u="in the room" color="bg-go text-white" />
+      </div>
 
-      <div className="mt-10">
+      <div className="mt-5">
+        <Standings state={state} online={online} title="Players" />
+      </div>
+
+      <div className="mt-8">
         {isHost ? (
-          <button onClick={onStart} disabled={busy} className={btn}>
-            {busy ? "Picking a route..." : "Start round 1"}
+          <button onClick={onStart} disabled={busy} className="btn-ink text-base">
+            {busy ? "Picking a route..." : "Start round 1 →"}
           </button>
         ) : (
-          <p className="text-muted">Waiting for {hostName(state)} to start the race.</p>
+          <p className="border-l-[3px] border-ink pl-3.5 text-muted">
+            Waiting for <b className="text-ink">{hostName(state)}</b> to start the race.
+          </p>
         )}
         <Notice text={notice} />
       </div>
-    </main>
+    </RoomShell>
   );
 }
 
@@ -114,26 +149,35 @@ export function Waiting({ state, now }: { state: RoomState; now: number }) {
   }
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-12" aria-live="polite">
-      <h1 className="text-5xl font-extrabold leading-none tracking-tight">{headline}</h1>
-      <p className="mt-4 text-lg text-muted">{sub}</p>
-      <p className="mt-8 font-medium">
-        {closing
-          ? "Scoring the round..."
-          : `Waiting for the others · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} left`}
+    <RoomShell code={state.room.code}>
+      <p className="kicker mt-10 text-muted">
+        Round {round.number} of {state.room.roundsTotal} · {round.start} → {round.target}
       </p>
-      <ul className="mt-4 divide-y divide-line rounded-2xl bg-surface ring-1 ring-line">
-        {liveOrder(state.runs).map((r) => (
-          <li key={r.playerId} className="flex items-center gap-3 px-4 py-3">
-            <span className="min-w-0 flex-1 truncate font-medium">{nameOf(state, r.playerId)}</span>
-            <span className="text-sm text-muted">{STATUS_TEXT[r.status]}</span>
-            <span className="w-20 text-right tabular-nums">
-              {r.clicks} click{r.clicks === 1 ? "" : "s"}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </main>
+      <h1 className="display mt-2 text-5xl sm:text-6xl" aria-live="polite">
+        {headline}
+      </h1>
+      <p className="mt-4 text-lg text-muted">{sub}</p>
+
+      <div className="mt-8">
+        <Panel
+          title={closing ? "Scoring the round" : "Race progress"}
+          color={closing ? "bg-purple" : "bg-sun"}
+          note={closing ? "measuring routes..." : `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} left`}
+        >
+          <ul>
+            {liveOrder(state.runs).map((r) => (
+              <li key={r.playerId} className="flex items-center gap-3 border-b border-hair px-5 py-3 last:border-0">
+                <span className="min-w-0 flex-1 truncate font-bold">{nameOf(state, r.playerId)}</span>
+                <StatusTag status={r.status} />
+                <span className="w-20 text-right font-black tabular-nums">
+                  {r.clicks} <span className="kicker font-bold text-muted">click{r.clicks === 1 ? "" : "s"}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      </div>
+    </RoomShell>
   );
 }
 
@@ -141,11 +185,15 @@ export function Waiting({ state, now }: { state: RoomState; now: number }) {
 
 function runSummary(run: RunView, target: string): string {
   if (run.status === "finished") {
-    const secs = run.elapsedMs != null ? `, ${(run.elapsedMs / 1000).toFixed(1)}s` : "";
+    const secs = run.elapsedMs != null ? ` in ${(run.elapsedMs / 1000).toFixed(1)}s` : "";
     return `${run.clicks} click${run.clicks === 1 ? "" : "s"}${secs}`;
   }
-  const how = STATUS_TEXT[run.status];
-  return run.closeness ? `${how}. ${describeCloseness(run.closeness, target)}` : how;
+  // Neutral wording: this line is shown for every player, not just you.
+  const d = run.closeness?.distance;
+  if (d === 1) return `Stopped one click from ${target}`;
+  if (d === 2) return `Stopped two clicks from ${target}`;
+  if (d === 3) return `Stopped a few clicks from ${target}`;
+  return STATUS_TEXT[run.status];
 }
 
 interface ResultsProps {
@@ -163,45 +211,69 @@ export function Results({ state, busy, notice, onNext, onRematch }: ResultsProps
   const ranked = resultOrder(state.runs);
   const [open, setOpen] = useState<string | null>(state.me);
   const leader = [...state.players].sort((a, b) => b.total - a.total)[0];
+  const iWon = leader?.id === state.me;
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-12">
-      <p className="text-sm font-medium text-muted">
+    <RoomShell code={state.room.code}>
+      <p className="kicker mt-10 text-muted">
         Round {round.number} of {state.room.roundsTotal} · {round.start} → {round.target}
       </p>
-      <h1 className="mt-2 text-5xl font-extrabold leading-none tracking-tight">
-        {over && leader ? `${leader.id === state.me ? "You win" : `${leader.name} wins`}.` : "Round results"}
-      </h1>
+      <h1 className="display mt-2 text-5xl sm:text-6xl">{over ? "Game over." : "Round results."}</h1>
 
-      <ol className="mt-8 space-y-3">
+      {over && leader && (
+        <div className="frame mt-6 flex flex-wrap items-end justify-between gap-4 rounded-2xl bg-go p-5 text-white">
+          <div>
+            <div className="kicker opacity-90">Winner</div>
+            <div className="mt-1 text-4xl font-black leading-none tracking-tighter">
+              {iWon ? "You" : leader.name}
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[42px] font-black leading-none tracking-tighter tabular-nums">{leader.total}</div>
+            <div className="kicker opacity-90">points</div>
+          </div>
+        </div>
+      )}
+
+      <ol className="mt-6 space-y-3">
         {ranked.map((r, i) => {
           const expanded = open === r.playerId;
           return (
-            <li key={r.playerId} className="rounded-2xl bg-surface ring-1 ring-line">
+            <li key={r.playerId} className="frame overflow-hidden rounded-2xl bg-surface">
               <button
                 onClick={() => setOpen(expanded ? null : r.playerId)}
                 aria-expanded={expanded}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left"
+                className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-bg"
               >
-                <span className="w-6 text-sm font-bold tabular-nums text-muted">{i + 1}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold">{nameOf(state, r.playerId)}</span>
-                  <span className="block text-sm text-muted">{runSummary(r, round.target)}</span>
-                </span>
                 <span
-                  className={`text-2xl font-extrabold tabular-nums ${r.status === "finished" ? "text-go" : ""}`}
+                  className={`grid size-9 shrink-0 place-items-center rounded-full text-sm font-black ${
+                    i === 0 ? "bg-sun" : "frame bg-bg"
+                  }`}
                 >
-                  {r.score ?? 0}
+                  {i + 1}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2">
+                    <span className="truncate text-lg font-extrabold tracking-tight">{nameOf(state, r.playerId)}</span>
+                    <StatusTag status={r.status} />
+                  </span>
+                  <span className="mt-0.5 block text-sm text-muted">{runSummary(r, round.target)}</span>
+                </span>
+                <span className="text-right">
+                  <span className="block text-3xl font-black leading-none tracking-tighter tabular-nums">
+                    {r.score ?? 0}
+                  </span>
+                  <span className="kicker text-muted">pts {expanded ? "▴" : "▾"}</span>
                 </span>
               </button>
               {expanded && (
-                <div className="border-t border-line px-4 py-4">
+                <div className="grid gap-5 border-t-[1.5px] border-ink bg-bg px-4 py-4 sm:grid-cols-[1fr_1.2fr]">
                   {r.scoreParts && (
-                    <ul className="mb-5 space-y-1 text-sm">
+                    <ul className="text-sm">
                       {r.scoreParts.map((p) => (
-                        <li key={p.label} className="flex justify-between gap-6">
-                          <span className="text-muted">{p.label}</span>
-                          <span className="font-semibold tabular-nums">
+                        <li key={p.label} className="flex justify-between gap-4 border-b border-hair py-1.5 last:border-0">
+                          <span>{p.label}</span>
+                          <span className="font-bold tabular-nums">
                             {p.points < 0 ? `−${-p.points}` : `+${p.points}`}
                           </span>
                         </li>
@@ -221,29 +293,29 @@ export function Results({ state, busy, notice, onNext, onRematch }: ResultsProps
         })}
       </ol>
 
-      <h2 className="mb-3 mt-10 text-xl font-bold">{over ? "Final standings" : "Standings"}</h2>
-      <Standings state={state} />
+      <div className="mt-5">
+        <Standings state={state} title={over ? "Final standings" : "Standings"} />
+      </div>
 
-      <div className="mt-10">
+      <div className="mt-8">
         {isHost ? (
-          <button onClick={over ? onRematch : onNext} disabled={busy} className={btn}>
+          <button onClick={over ? onRematch : onNext} disabled={busy} className="btn-ink text-base">
             {busy
               ? over
                 ? "Setting up..."
                 : "Picking a route..."
               : over
-                ? "Rematch"
-                : `Start round ${round.number + 1}`}
+                ? "Rematch →"
+                : `Start round ${round.number + 1} →`}
           </button>
         ) : (
-          <p className="text-muted">
-            {over
-              ? `Waiting for ${hostName(state)} to start a rematch.`
-              : `Waiting for ${hostName(state)} to start the next round.`}
+          <p className="border-l-[3px] border-ink pl-3.5 text-muted">
+            Waiting for <b className="text-ink">{hostName(state)}</b> to start{" "}
+            {over ? "a rematch" : "the next round"}.
           </p>
         )}
         <Notice text={notice} />
       </div>
-    </main>
+    </RoomShell>
   );
 }

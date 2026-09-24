@@ -3,24 +3,24 @@
 import { useEffect, useRef } from "react";
 
 // The game's visual idea: a path through Wikipedia is a transit line.
-// Articles are stations, the target is the terminus.
+// Articles are ink stations; the target is an amber square terminus.
 
 /** Landing-page line. While a round loads, a dot runs along it. */
 export function LineDemo({ running }: { running: boolean }) {
   return (
     <div className="relative my-10 h-8" aria-hidden="true">
-      <div className="absolute left-0 right-0 top-1/2 h-1 -translate-y-1/2 rounded bg-line" />
+      <div className="absolute left-0 right-0 top-1/2 h-[3px] -translate-y-1/2 rounded bg-ink" />
       <div className="absolute left-0 right-3 top-0 h-full">
         {[0, 34, 68].map((left) => (
           <span
             key={left}
-            className="absolute top-1/2 size-4 -translate-y-1/2 rounded-full border-4 border-signal bg-bg"
+            className="absolute top-1/2 size-4 -translate-y-1/2 rounded-full border-[2.5px] border-ink bg-bg"
             style={{ left: `${left}%` }}
           />
         ))}
         {running && <span className="train" />}
       </div>
-      <span className="absolute right-0 top-1/2 size-7 -translate-y-1/2 rounded-full border-4 border-ink bg-sun" />
+      <span className="absolute right-0 top-1/2 size-7 -translate-y-1/2 rounded-md border-2 border-ink bg-sun" />
     </div>
   );
 }
@@ -41,29 +41,29 @@ export function Trail({ path, target }: { path: string[]; target: string }) {
       className="hide-scrollbar flex min-w-0 flex-1 items-center overflow-x-auto"
       aria-label="Your route so far"
     >
-      {cut > 0 && <li className="shrink-0 pr-2 text-xs text-muted">+{cut} earlier</li>}
+      {cut > 0 && <li className="kicker shrink-0 pr-2 text-muted">+{cut} earlier</li>}
       {shown.map((title, i) => {
         const current = i === shown.length - 1;
         return (
           <li key={`${cut + i}-${title}`} className="flex shrink-0 items-center">
             <span
               className={`mr-1.5 size-2.5 rounded-full ${
-                current ? "bg-signal ring-4 ring-signal/25" : "border-2 border-signal bg-bg"
+                current ? "bg-ink ring-[3px] ring-sun" : "border-2 border-ink bg-bg"
               }`}
             />
             <span
-              className={`max-w-32 truncate text-xs ${current ? "font-semibold" : "text-muted"}`}
+              className={`max-w-32 truncate text-xs ${current ? "font-bold" : "font-medium text-muted"}`}
               title={title}
             >
               {title}
             </span>
-            <span className="mx-2 h-0.5 w-4 shrink-0 rounded bg-line" />
+            <span className="mx-2 h-[2px] w-4 shrink-0 rounded bg-ink/35" />
           </li>
         );
       })}
       <li className="flex shrink-0 items-center">
-        <span className="mr-1.5 size-3 rounded-full border-2 border-ink bg-sun" />
-        <span className="max-w-32 truncate text-xs font-semibold" title={target}>
+        <span className="mr-1.5 size-3 rounded-[3px] border-[1.5px] border-ink bg-sun" />
+        <span className="max-w-32 truncate text-xs font-bold" title={target}>
           {target}
         </span>
       </li>
@@ -95,25 +95,25 @@ export function RouteMap({ path, target, won, distance }: RouteMapProps) {
         return (
           <li key={`${i}-${title}`} className="relative flex gap-4 pb-5 last:pb-0">
             {/* solid line down to the next station */}
-            {!last && <span className="absolute bottom-0 left-2 top-5 w-1 rounded bg-signal" />}
+            {!last && <span className="absolute bottom-0 left-[9px] top-5 w-[3px] rounded bg-ink" />}
             <span
-              className={`relative z-[1] mt-0.5 size-5 shrink-0 rounded-full border-4 ${
+              className={`relative z-[1] mt-0.5 size-5 shrink-0 border-[2.5px] border-ink ${
                 finishedHere
-                  ? "border-go bg-go"
+                  ? "rounded-md bg-go"
                   : stoppedHere && !first
-                    ? "border-stop bg-bg"
+                    ? "rounded-full bg-stop"
                     : first
-                      ? "border-signal bg-signal"
-                      : "border-signal bg-bg"
+                      ? "rounded-full bg-ink"
+                      : "rounded-full bg-bg"
               }`}
             />
             <div className="min-w-0">
-              <div className={`break-words ${finishedHere ? "text-lg font-bold" : "font-medium"}`}>
+              <div className={`break-words ${finishedHere ? "text-lg font-extrabold" : "font-semibold"}`}>
                 {title}
               </div>
-              {first && <div className="text-sm text-muted">Where you started</div>}
-              {stoppedHere && !first && <div className="text-sm text-stop">Where you stopped</div>}
-              {finishedHere && <div className="text-sm text-go">Target reached</div>}
+              {first && <div className="kicker mt-0.5 text-muted">Where you started</div>}
+              {stoppedHere && !first && <div className="kicker mt-0.5 text-stop">Where you stopped</div>}
+              {finishedHere && <div className="kicker mt-0.5 text-go">Target reached</div>}
             </div>
           </li>
         );
@@ -121,11 +121,11 @@ export function RouteMap({ path, target, won, distance }: RouteMapProps) {
       {!won && (
         <li className="relative flex gap-4 pt-6">
           {/* dashed run to a target you didn't reach */}
-          <span className="absolute left-2 top-0 h-6 border-l-4 border-dashed border-line" />
-          <span className="relative z-[1] mt-0.5 size-5 shrink-0 rounded-full border-4 border-ink bg-sun" />
+          <span className="absolute left-[9px] top-0 h-6 border-l-[3px] border-dashed border-ink/40" />
+          <span className="relative z-[1] mt-0.5 size-5 shrink-0 rounded-md border-[2.5px] border-ink bg-sun" />
           <div className="min-w-0">
-            <div className="break-words font-bold">{target}</div>
-            <div className="text-sm text-muted">{gap ? `Target, ${gap} away` : "Target"}</div>
+            <div className="break-words font-extrabold">{target}</div>
+            <div className="kicker mt-0.5 text-muted">{gap ? `Target, ${gap} away` : "Target"}</div>
           </div>
         </li>
       )}

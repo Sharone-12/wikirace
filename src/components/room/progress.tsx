@@ -40,24 +40,59 @@ export function resultOrder(runs: RunView[]): RunView[] {
   return [...runs].sort((a, b) => compareResults(key(a), key(b)));
 }
 
+/** Colour for a run's outcome, used on tags and chips. */
+export const STATUS_FILL: Record<RunStatus, string> = {
+  playing: "bg-surface",
+  finished: "bg-go text-white",
+  gave_up: "bg-bg text-muted",
+  timed_out: "bg-stop text-white",
+};
+
+/** Small uppercase pill naming how a run is going or ended. */
+export function StatusTag({ status }: { status: RunStatus }) {
+  return (
+    <span className={`kicker frame shrink-0 rounded-full px-2 py-0.5 text-[9.5px] ${STATUS_FILL[status]}`}>
+      {STATUS_TEXT[status]}
+    </span>
+  );
+}
+
+/** A framed panel with the mulenet header row: colour square, title, uppercase note. */
+export function Panel({
+  title,
+  note,
+  color = "bg-ink",
+  children,
+}: {
+  title: string;
+  note?: string;
+  color?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="frame overflow-hidden rounded-[22px] bg-surface">
+      <div className="flex items-center gap-2.5 border-b-[1.5px] border-ink px-5 py-3.5">
+        <span className={`size-[11px] shrink-0 rounded-[3px] ${color}`} />
+        <h2 className="text-[15px] font-extrabold tracking-tight">{title}</h2>
+        {note && <span className="kicker ml-auto text-muted">{note}</span>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 /** One chip per racer: name, clicks, and how their run ended. */
 export function ProgressChips({ state }: { state: RoomState }) {
   return (
-    <ul className="mt-2.5 flex gap-2 overflow-x-auto pb-1 text-sm" aria-label="Race progress">
+    <ul className="hide-scrollbar mt-2.5 flex gap-2 overflow-x-auto pb-0.5 text-sm" aria-label="Race progress">
       {liveOrder(state.runs).map((r) => (
         <li
           key={r.playerId}
-          className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 ring-1 ${
-            r.status === "finished"
-              ? "bg-go/10 ring-go/40"
-              : r.status === "playing"
-                ? "bg-surface ring-line"
-                : "opacity-60 ring-line"
-          }`}
+          className={`frame flex shrink-0 items-center gap-2 rounded-full py-1 pl-3 pr-2.5 ${STATUS_FILL[r.status]}`}
         >
-          <span className="max-w-[10ch] truncate font-medium">{nameOf(state, r.playerId)}</span>
-          <span className="tabular-nums text-muted">{r.clicks}</span>
-          {r.status !== "playing" && <span className="text-xs text-muted">{STATUS_TEXT[r.status]}</span>}
+          <span className="max-w-[10ch] truncate font-bold">{nameOf(state, r.playerId)}</span>
+          <span className="font-black tabular-nums">{r.clicks}</span>
+          {r.status !== "playing" && <span className="kicker text-[9.5px]">{STATUS_TEXT[r.status]}</span>}
         </li>
       ))}
     </ul>
@@ -65,27 +100,44 @@ export function ProgressChips({ state }: { state: RoomState }) {
 }
 
 /** Running totals across rounds, best first. */
-export function Standings({ state, online }: { state: RoomState; online?: Set<string> }) {
+export function Standings({
+  state,
+  online,
+  title = "Standings",
+}: {
+  state: RoomState;
+  online?: Set<string>;
+  title?: string;
+}) {
   const players = [...state.players].sort((a, b) => b.total - a.total);
+  const here = online ? players.filter((p) => online.has(p.id)).length : null;
   return (
-    <ol className="divide-y divide-line rounded-2xl bg-surface ring-1 ring-line">
-      {players.map((p, i) => (
-        <li key={p.id} className="flex items-center gap-3 px-4 py-3">
-          <span className="w-6 text-sm font-bold tabular-nums text-muted">{i + 1}</span>
-          {online && (
-            <span
-              className={`size-2.5 rounded-full ${online.has(p.id) ? "bg-go" : "bg-line"}`}
-              title={online.has(p.id) ? "Online" : "Away"}
-            />
-          )}
-          <span className="min-w-0 flex-1 truncate font-medium">
-            {p.name}
-            {p.id === state.me && <span className="text-muted"> (you)</span>}
-            {p.id === state.room.hostId && <span className="ml-2 text-xs text-muted">host</span>}
-          </span>
-          <span className="font-bold tabular-nums">{p.total}</span>
-        </li>
-      ))}
-    </ol>
+    <Panel
+      title={title}
+      color="bg-go"
+      note={here !== null ? `${here} online` : `${players.length} player${players.length === 1 ? "" : "s"}`}
+    >
+      <ol>
+        {players.map((p, i) => (
+          <li key={p.id} className="flex items-center gap-3 border-b border-hair px-5 py-3 last:border-0">
+            <span className="kicker w-6 tabular-nums text-muted">{String(i + 1).padStart(2, "0")}</span>
+            {online && (
+              <span
+                className={`size-2 shrink-0 rounded-full ${online.has(p.id) ? "bg-go" : "bg-stop"}`}
+                title={online.has(p.id) ? "Online" : "Away"}
+              />
+            )}
+            <span className="min-w-0 flex-1 truncate font-bold">
+              {p.name}
+              {p.id === state.me && <span className="font-medium text-muted"> (you)</span>}
+            </span>
+            {p.id === state.room.hostId && (
+              <span className="kicker frame rounded-full bg-sun px-2 py-0.5 text-[9.5px]">host</span>
+            )}
+            <span className="w-14 text-right text-lg font-black tabular-nums tracking-tight">{p.total}</span>
+          </li>
+        ))}
+      </ol>
+    </Panel>
   );
 }

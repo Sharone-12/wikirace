@@ -3,13 +3,20 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Brand } from "@/components/Brand";
 import { apiCall } from "@/lib/client/api";
 import { ensureIdentity, loadIdentity } from "@/lib/client/identity";
 
-const input =
-  "rounded-xl border-2 border-line bg-surface px-4 py-3 text-lg font-normal outline-none transition-colors focus:border-signal";
-const btn =
-  "rounded-xl bg-signal px-7 py-3.5 text-lg font-bold text-signal-ink transition-transform active:scale-[0.98] disabled:opacity-50";
+const select =
+  "frame w-full appearance-none rounded-full bg-bg px-4 py-2.5 font-bold outline-none focus:shadow-[0_0_0_3px_var(--ink)]";
+
+function Chevron() {
+  return (
+    <span aria-hidden="true" className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs">
+      ▼
+    </span>
+  );
+}
 
 /** Create a room or join one by code. */
 export default function Entry() {
@@ -65,73 +72,83 @@ export default function Entry() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-14">
-      <Link href="/" className="text-sm font-medium text-muted underline">
-        Play solo instead
-      </Link>
-      <h1 className="mt-6 text-5xl font-extrabold leading-[0.98] tracking-tight sm:text-6xl">
-        Race your friends.
-      </h1>
+    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8">
+      <div className="flex items-start justify-between gap-4">
+        <Brand tagline="multiplayer race" />
+        <Link href="/" className="btn-line px-4 py-2 text-sm">
+          Play solo
+        </Link>
+      </div>
+
+      <h1 className="display mt-12 text-5xl sm:text-7xl">Race your friends.</h1>
       <p className="mt-5 max-w-[46ch] text-lg text-muted">
         Everyone gets the same start and target. Fewest clicks and fastest time win the round.
       </p>
 
-      <label className="mt-10 flex flex-col gap-1.5 text-sm font-medium">
-        Your name
+      <label className="frame mt-10 flex flex-col gap-1.5 rounded-[22px] bg-surface p-4">
+        <span className="kicker text-muted">Your name</span>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           maxLength={20}
           autoComplete="nickname"
           disabled={busy}
-          className={input}
+          className="field text-lg"
         />
       </label>
 
-      <div className="mt-8 grid gap-6 sm:grid-cols-2">
-        <form onSubmit={create} className="flex flex-col gap-3 rounded-2xl bg-surface p-5 ring-1 ring-line">
-          <h2 className="text-xl font-bold">New room</h2>
-          <div className="flex gap-3">
-            <label className="flex flex-1 flex-col gap-1 text-sm font-medium">
-              Rounds
-              <select
-                value={rounds}
-                onChange={(e) => setRounds(Number(e.target.value))}
-                disabled={busy}
-                className="rounded-lg border-2 border-line bg-bg px-3 py-2"
-              >
-                {[1, 3, 5, 10].map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <form onSubmit={create} className="frame relative flex flex-col gap-4 rounded-[22px] bg-sun p-5">
+          <div className="flex items-start justify-between">
+            <span className="text-[21px] font-extrabold tracking-tight">01</span>
+            <span className="font-bold" aria-hidden="true">
+              ↗
+            </span>
+          </div>
+          <h2 className="-mt-2 text-2xl font-black tracking-tight">New room</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1.5">
+              <span className="kicker">Rounds</span>
+              <span className="relative">
+                <select value={rounds} onChange={(e) => setRounds(Number(e.target.value))} disabled={busy} className={select}>
+                  {[1, 3, 5, 10].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+                <Chevron />
+              </span>
             </label>
-            <label className="flex flex-1 flex-col gap-1 text-sm font-medium">
-              Minutes each
-              <select
-                value={minutes}
-                onChange={(e) => setMinutes(Number(e.target.value))}
-                disabled={busy}
-                className="rounded-lg border-2 border-line bg-bg px-3 py-2"
-              >
-                {[2, 3, 5, 10].map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
+            <label className="flex flex-col gap-1.5">
+              <span className="kicker">Minutes each</span>
+              <span className="relative">
+                <select value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} disabled={busy} className={select}>
+                  {[2, 3, 5, 10].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+                <Chevron />
+              </span>
             </label>
           </div>
-          <button type="submit" disabled={!name.trim() || busy} className={`${btn} mt-auto`}>
-            Create room
+          <button type="submit" disabled={!name.trim() || busy} className="btn-ink mt-auto">
+            Create room →
           </button>
         </form>
 
-        <form onSubmit={join} className="flex flex-col gap-3 rounded-2xl bg-surface p-5 ring-1 ring-line">
-          <h2 className="text-xl font-bold">Join a room</h2>
-          <label className="flex flex-col gap-1 text-sm font-medium">
-            Room code
+        <form onSubmit={join} className="frame flex flex-col gap-4 rounded-[22px] bg-signal p-5 text-white">
+          <div className="flex items-start justify-between">
+            <span className="text-[21px] font-extrabold tracking-tight">02</span>
+            <span className="font-bold" aria-hidden="true">
+              ↗
+            </span>
+          </div>
+          <h2 className="-mt-2 text-2xl font-black tracking-tight">Join a room</h2>
+          <label className="flex flex-col gap-1.5">
+            <span className="kicker">Room code</span>
             <input
               value={cleanCode}
               onChange={(e) => setCode(e.target.value)}
@@ -140,21 +157,21 @@ export default function Entry() {
               autoComplete="off"
               spellCheck={false}
               disabled={busy}
-              className={`${input} uppercase tracking-[0.3em]`}
+              className="field text-center text-2xl font-black uppercase tracking-[0.4em]"
             />
           </label>
           <button
             type="submit"
             disabled={!name.trim() || cleanCode.length !== 4 || busy}
-            className={`${btn} mt-auto`}
+            className="btn-ink mt-auto"
           >
-            Join
+            Join →
           </button>
         </form>
       </div>
 
       {error && (
-        <p role="alert" className="mt-4 rounded-lg bg-stop/10 px-3 py-2 text-sm text-stop">
+        <p role="alert" className="frame mt-4 rounded-2xl bg-stop px-3.5 py-2.5 text-sm font-semibold text-white">
           {error}
         </p>
       )}

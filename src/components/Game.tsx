@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BlockLink, Brand } from "@/components/Brand";
 import { ArticleView, RaceHeader } from "@/components/RaceHeader";
 import { LineDemo, RouteMap } from "@/components/RouteLine";
 import { pickTarget } from "@/lib/targets";
@@ -174,55 +175,59 @@ export default function Game() {
   if (phase === "name" || phase === "loading") {
     const loading = phase === "loading";
     return (
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-6 py-14">
-        <h1 className="text-5xl font-extrabold leading-[0.98] tracking-tight sm:text-7xl">
-          Get from here to there, one link at a time.
-        </h1>
-        <p className="mt-6 max-w-[46ch] text-lg text-muted">
-          You start on a random Wikipedia article. Reach the target using only the links on the
-          page. You have {TIME_LIMIT / 60} minutes.
-        </p>
-
-        <LineDemo running={loading} />
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            startRound();
-          }}
-          className="flex flex-col gap-3 sm:flex-row sm:items-end"
-        >
-          <label className="flex flex-1 flex-col gap-1.5 text-sm font-medium">
-            Your name
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={20}
-              autoFocus
-              autoComplete="nickname"
-              disabled={loading}
-              className="rounded-xl border-2 border-line bg-surface px-4 py-3 text-lg font-normal outline-none transition-colors focus:border-signal"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={!name.trim() || loading}
-            className="rounded-xl bg-signal px-7 py-3.5 text-lg font-bold text-signal-ink transition-transform active:scale-[0.98] disabled:opacity-50"
-          >
-            {loading ? "Finding your route..." : "Start racing"}
-          </button>
-        </form>
-        {error && (
-          <p role="alert" className="mt-4 rounded-lg bg-stop/10 px-3 py-2 text-sm text-stop">
-            {error}
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6 py-8">
+        <Brand />
+        <div className="flex flex-1 flex-col justify-center py-10">
+          <h1 className="display text-5xl sm:text-7xl">
+            Get from here to there, one link at a time.
+          </h1>
+          <p className="mt-6 max-w-[46ch] text-lg text-muted">
+            You start on a random Wikipedia article. Reach the target using only the links on the
+            page. You have {TIME_LIMIT / 60} minutes.
           </p>
-        )}
-        <p className="mt-8 text-sm text-muted">
-          Going back costs a click. Fewer clicks and more time left score higher.
-        </p>
-        <Link href="/play" className="mt-4 self-start text-sm font-semibold text-signal underline">
-          Play with friends
-        </Link>
+
+          <LineDemo running={loading} />
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              startRound();
+            }}
+            className="frame flex flex-col gap-3 rounded-[22px] bg-surface p-4 sm:flex-row sm:items-end"
+          >
+            <label className="flex flex-1 flex-col gap-1.5">
+              <span className="kicker text-muted">Your name</span>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={20}
+                autoFocus
+                autoComplete="nickname"
+                disabled={loading}
+                className="field text-lg"
+              />
+            </label>
+            <button type="submit" disabled={!name.trim() || loading} className="btn-ink text-base">
+              {loading ? "Finding your route..." : "Start racing →"}
+            </button>
+          </form>
+          {error && (
+            <p role="alert" className="frame mt-3 rounded-2xl bg-stop px-3.5 py-2.5 text-sm font-semibold text-white">
+              {error}
+            </p>
+          )}
+
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="flex min-h-24 flex-col justify-between rounded-2xl bg-sun p-3.5 shadow-[inset_0_0_0_2.5px_var(--ink)]">
+              <span className="text-[21px] font-extrabold tracking-tight">01</span>
+              <span className="text-sm font-bold leading-tight">Solo race</span>
+            </div>
+            <BlockLink href="/play" n="02" label="Race your friends" color="bg-signal text-white" />
+            <p className="col-span-2 border-l-[3px] border-ink pl-3.5 text-sm leading-relaxed text-muted sm:col-span-1 sm:self-center">
+              Going back costs a click. Fewer clicks and more time left score higher.
+            </p>
+          </div>
+        </div>
       </main>
     );
   }
@@ -235,10 +240,12 @@ export default function Game() {
 
     const headline = won ? `${name} made it.` : outcome === "gave-up" ? "Stopped short." : "Out of time.";
     return (
-      <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-12">
-        <h1 className="text-5xl font-extrabold leading-none tracking-tight sm:text-6xl">
-          {headline}
-        </h1>
+      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8">
+        <Brand />
+        <p className="kicker mt-10 text-muted">
+          Solo race · {path[0]} → {target}
+        </p>
+        <h1 className="display mt-2 text-5xl sm:text-6xl">{headline}</h1>
         <p className="mt-4 text-lg text-muted">
           {won
             ? `${target} in ${clicks} click${clicks === 1 ? "" : "s"} and ${elapsed.toFixed(1)} seconds.`
@@ -247,59 +254,90 @@ export default function Game() {
             ` You left the tab ${tabSwitches} time${tabSwitches === 1 ? "" : "s"}.`}
         </p>
 
-        <section
-          className="mt-8 rounded-2xl bg-surface p-6 ring-1 ring-line"
-          aria-live="polite"
-        >
-          {score ? (
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <div className="text-sm font-medium text-muted">Your score</div>
-                <div
-                  className={`text-7xl font-extrabold leading-none tabular-nums ${won ? "text-go" : ""}`}
-                >
-                  {score.total}
-                </div>
-                {closeness && !won && (
-                  <p className="mt-3 max-w-[30ch] text-sm text-muted">
-                    {describeCloseness(closeness, target)}
-                  </p>
-                )}
-              </div>
-              <ul className="min-w-56 space-y-1.5 text-sm">
-                {score.parts.map((p) => (
-                  <li key={p.label} className="flex justify-between gap-6">
-                    <span className="text-muted">{p.label}</span>
-                    <span className="font-semibold tabular-nums">
-                      {p.points < 0 ? `−${-p.points}` : `+${p.points}`}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : closenessFailed ? (
-            <p role="alert" className="text-sm text-stop">
-              Couldn&apos;t work out how close you got because Wikipedia didn&apos;t respond.
-            </p>
-          ) : (
-            <p className="text-muted">Working out how close you got...</p>
-          )}
+        <section className="mt-8 grid gap-3 sm:grid-cols-3" aria-live="polite">
+          <div
+            className={`frame flex min-h-28 flex-col justify-between rounded-2xl p-4 ${
+              score ? (won ? "bg-go text-white" : "bg-sun") : "bg-surface"
+            }`}
+          >
+            <span className="kicker">Your score</span>
+            {score ? (
+              <span className="text-5xl font-black leading-none tracking-tighter tabular-nums">
+                {score.total}
+              </span>
+            ) : closenessFailed ? (
+              <span role="alert" className="text-sm font-semibold text-stop">
+                Couldn&apos;t measure it: Wikipedia didn&apos;t respond.
+              </span>
+            ) : (
+              <span className="text-sm font-semibold text-muted">Working it out...</span>
+            )}
+            <span className="text-xs font-semibold opacity-75">{won ? "finished" : "by closeness"}</span>
+          </div>
+          <div className="frame flex min-h-28 flex-col justify-between rounded-2xl bg-signal p-4 text-white">
+            <span className="kicker">Clicks</span>
+            <span className="text-5xl font-black leading-none tracking-tighter tabular-nums">{clicks}</span>
+            <span className="text-xs font-semibold opacity-75">back counts as one</span>
+          </div>
+          <div className="frame flex min-h-28 flex-col justify-between rounded-2xl bg-surface p-4">
+            <span className="kicker">Time</span>
+            <span className="text-5xl font-black leading-none tracking-tighter tabular-nums">
+              {Math.round(elapsed)}
+              <span className="text-2xl">s</span>
+            </span>
+            <span className="text-xs font-semibold text-muted">of {TIME_LIMIT}s</span>
+          </div>
         </section>
 
-        <h2 className="mb-5 mt-10 text-xl font-bold">Your route</h2>
-        <RouteMap
-          path={path}
-          target={target}
-          won={won}
-          distance={closeness?.distance ?? null}
-        />
+        {closeness && !won && (
+          <p className="mt-5 border-l-[3px] border-ink pl-3.5 text-sm leading-relaxed text-muted">
+            {describeCloseness(closeness, target)}
+          </p>
+        )}
 
-        <button
-          onClick={startRound}
-          className="mt-10 rounded-xl bg-signal px-7 py-3.5 text-lg font-bold text-signal-ink transition-transform active:scale-[0.98]"
-        >
-          Play again
-        </button>
+        {score && (
+          <section className="frame mt-5 overflow-hidden rounded-[22px] bg-surface">
+            <div className="flex items-center gap-2.5 border-b-[1.5px] border-ink px-5 py-3.5">
+              <span className="size-[11px] rounded-[3px] bg-sun" />
+              <h2 className="text-[15px] font-extrabold tracking-tight">Score breakdown</h2>
+            </div>
+            <ul className="px-5 py-2 text-sm">
+              {score.parts.map((p) => (
+                <li
+                  key={p.label}
+                  className="flex justify-between gap-6 border-b border-hair py-2 last:border-0"
+                >
+                  <span>{p.label}</span>
+                  <span className="font-bold tabular-nums">
+                    {p.points < 0 ? `−${-p.points}` : `+${p.points}`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <section className="frame mt-5 overflow-hidden rounded-[22px] bg-surface">
+          <div className="flex items-center gap-2.5 border-b-[1.5px] border-ink px-5 py-3.5">
+            <span className="size-[11px] rounded-[3px] bg-signal" />
+            <h2 className="text-[15px] font-extrabold tracking-tight">Your route</h2>
+            <span className="kicker ml-auto text-muted">
+              {path.length} stop{path.length === 1 ? "" : "s"}
+            </span>
+          </div>
+          <div className="p-5">
+            <RouteMap path={path} target={target} won={won} distance={closeness?.distance ?? null} />
+          </div>
+        </section>
+
+        <div className="mt-8 flex flex-wrap items-center gap-3">
+          <button onClick={startRound} className="btn-ink text-base">
+            Play again →
+          </button>
+          <Link href="/play" className="btn-line px-5 py-3">
+            Race your friends
+          </Link>
+        </div>
       </main>
     );
   }
