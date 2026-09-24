@@ -1,0 +1,496 @@
+first, the hard problems i need to solve in this plan:
+
+Problem 1: Page pair generation
+you can't just pick two random Wikipedia articles. "List of municipalities in Norway" → "Quantum field theory" could be 50+ clicks or literally impossible. the game needs to be fun, meaning 4-12 clicks is the sweet spot.
+
+solutions:
+
+curated pairs — manually pick 100-200 pairs you know are connected (e.g. "Lionel Messi" → "World Cup"). boring to maintain but guaranteed quality
+six degrees method — always start or end at a high-connectivity article (countries, major cities, famous people, broad concepts). these have tons of links so they're almost always reachable
+Wikipedia "random" API + validation — use api.php?action=query&list=random for start page, and pick the target from a known pool of well-connected articles (top 500 most linked Wikipedia pages is a public dataset)
+
+best approach: random start + curated target pool. grab the ~200 most linked-to Wikipedia articles (United States, World War II, England, France, India, etc.), pick one as the target. random article as start. these big articles are reachable from almost anywhere in under 15 clicks.
+
+Problem 2: Wikipedia API + rendering
+the API endpoint en.wikipedia.org/w/api.php?action=parse&page=TITLE&format=json returns full HTML. but it's Wikipedia's raw HTML — infoboxes, citation superscripts, edit buttons, external links, category links, disambiguation notices. you need to:
+
+strip edit links, external links, references section, category bar, navboxes
+rewrite all internal /wiki/X links to go through your click handler
+strip Special:, File:, Help:, Talk:, Wikipedia: namespace links (only keep mainspace article links)
+handle redirects (API returns a redirect flag)
+handle disambiguation pages (show them normally, they're part of the game)
+style it so it doesn't look broken without Wikipedia's full CSS
+
+Problem 3: CORS
+Wikipedia API supports CORS with origin=* parameter. so from the browser: fetch('https://en.wikipedia.org/w/api.php?action=parse&page=India&format=json&origin=*') just works. no proxy needed.
+
+Problem 4: cheating prevention
+
+ctrl+F to search for the target word on the page — disable it (override keyboard shortcuts on the game div)
+opening Wikipedia in another tab — can't fully prevent this, but with a live click counter and timer, slow cheaters are obvious
+browser back button — intercept with popstate event, or just don't use browser navigation at all (it's a SPA)
+inspect element to find links — honestly for 20 friends who cares, but you can obfuscate link hrefs if you want
+
+Problem 5: what happens when someone gives up?
+add a "give up" button that ends their run. they get scored as DNF (did not finish). otherwise they could stall the game forever.
+
+also add a time limit per round — 3-5 minutes. if nobody reaches the target, whoever is "closest" (fewest links away? hard to calculate) just gets a DNF. keep it simple: either you reach it or you don't.
+
+the full plan:
+
+Stack: Next.js (App Router) + Supabase (Postgres + Realtime Broadcast + Presence) + Tailwind. deploy on Vercel.
+
+DB Schema:
+
+players
+├── id (uuid, auto)
+├── display_name (text)
+├── created_at (timestamp)
+
+games
+├── id (uuid, auto)
+├── room_code (text, 4-char, unique)
+├── host_id (uuid → players)
+├── status (enum: waiting / playing / finished)
+├── rounds_total (int, default 5)
+├── current_round (int)
+├── created_at (timestamp)
+
+game_players
+├── game_id (uuid → games)
+├── player_id (uuid → players)
+├── joined_at (timestamp)
+
+rounds
+├── id (uuid, auto)
+├── game_id (uuid → games)
+├── round_number (int)
+├── start_article (text)
+├── target_article (text)
+├── time_limit_seconds (int, default 180)
+├── started_at (timestamp)
+├── ended_at (timestamp)
+
+runs (one per player per round)
+├── id (uuid, auto)
+├── round_id (uuid → rounds)
+├── player_id (uuid → players)
+├── path (text[], array of article titles visited)
+├── total_clicks (int)
+├── finished (boolean)
+├── finished_at (timestamp, nullable)
+├── gave_up (boolean, default false)
+
+player_stats
+├── player_id (uuid → players, unique)
+├── games_played (int)
+├── rounds_won (int)
+├── avg_clicks_to_win (float)
+├── fastest_finish_seconds (float)
+├── total_dnfs (int)
+
+Realtime event flow:
+
+HOST CREATES GAME
+  → insert into games (status: waiting)
+  → generate room_code
+  → subscribe to Broadcast channel "room:{code}"
+  → subscribe to Presence (track who's in lobby)
+
+PLAYER JOINS
+  → insert into game_players
+  → join Broadcast channel + Presence
+  → Presence shows updated lobby list to everyone
+
+HOST STARTS ROUND
+  → pick random start article (Wikipedia random API)
+  → pick target from curated pool
+  → insert into rounds table
+  → Broadcast: { event: 'round-start', payload: { start, target, timeLimit } }
+  → everyone's client fetches the start article HTML
+
+PLAYER CLICKS A LINK
+  → update local path state
+  → Broadcast: { event: 'click', payload: { player, article, clickNumber } }
+  → all clients update the sidebar showing everyone's progress
+  → IF article === target:
+      → Broadcast: { event: 'finished', payload: { player, clicks, time } }
+      → write run to DB (path, total_clicks, finished: true, finished_at)
+
+PLAYER GIVES UP
+  → Broadcast: { event: 'gave-up', payload: { player } }
+  → write run to DB (finished: false, gave_up: true)
+
+ROUND ENDS (timer expires OR everyone finished/gave up)
+  → Broadcast: { event: 'round-end', payload: { results } }
+  → show scoreboard: winner, everyone's paths, click counts
+  → 10 second pause → next round or game end
+
+GAME ENDS
+  → aggregate stats → update player_stats
+  → Broadcast: { event: 'game-end', payload: { finalLeaderboard } }
+
+Page structure:
+
+/                     → landing page, "create game" or "join game"
+/game/[code]          → lobby → game → results (all in one page, state-driven)
+/leaderboard          → all-time stats across all games
+/history              → past games with expandable round details
+
+Wikipedia rendering component — the core piece:
+
+WikiPage component:
+  1. receives article title as prop
+  2. fetches from Wikipedia Parse API (with origin=*)
+  3. receives HTML string in response.parse.text["*"]
+  4. sanitization pass:
+     - remove elements: .mw-editsection, .reference, .reflist,
+       .navbox, .catlinks, .external, .mw-empty-elt,
+       #coordinates, .sistersitebox, .noprint
+     - remove links to non-mainspace (Special:, File:, Help:, etc.)
+     - remove external links (anything not starting with /wiki/)
+     - rewrite all /wiki/X links to onClick={handleClick}
+  5. renders sanitized HTML with dangerouslySetInnerHTML
+  6. header shows: current article title, click count, 
+     target article, timer countdown
+
+Scoring system:
+
+finished first → 100 points + (timeLeft × 0.5) bonus
+finished second → 75 points + (timeLeft × 0.3) bonus
+finished third → 50 points + (timeLeft × 0.2) bonus
+finished 4th+ → 25 points
+DNF / gave up → 0 points
+tiebreaker on same finish time → fewer clicks wins
+
+Curated target pool (seed ~50 to start, expand later):
+high-connectivity articles that are reachable from almost anywhere — United States, India, World War II, London, Football, Music, Science, Mathematics, English language, Christianity, France, Germany, China, Japan, etc. the game picks from this pool randomly.
+
+Anti-cheat (lightweight, friends-only):
+
+disable ctrl+F on the wiki content div
+disable right-click context menu on wiki content
+intercept browser back/forward
+no address bar since it's rendered in-app
+path is logged to DB — if someone magically jumps articles, it's obvious
+
+Polish features (v2, not day 1):
+
+"spectator mode" — watch an ongoing game without playing
+"impossible mode" — both start AND target are random
+"speed round" — 60 second time limit
+replay system — step through anyone's path click by click
+shareable results card (screenshot-able leaderboard for WhatsApp flexing)
+
+
+==========================================================================
+REVISION 2: gaps found in the plan above, fixes, and new ideas
+==========================================================================
+
+--------------------------------------------------------------------------
+A. HOLES IN THE ORIGINAL PLAN (and the fix for each)
+--------------------------------------------------------------------------
+
+A1. Broadcast is ephemeral, so late joiners and reconnects lose state
+  problem: phone locks, wifi drops, tab reloads mid-round -> player misses
+  'round-start' and 'click' events and can't recover.
+  fix: DB is the source of truth, Broadcast is only the "something changed"
+  ping. On (re)connect a client always fetches game state (game + current
+  round + all runs) and rebuilds. Local path is also mirrored in
+  sessionStorage so a refresh resumes the same run instead of restarting.
+
+A2. Client-authoritative timing and scoring is trivially cheatable
+  problem: a client broadcasts "finished, 4 clicks, 12s" and anyone can lie.
+  fix: server timestamps everything. The round's started_at is set by the DB
+  (now()), and finished_at is set by a Postgres function/route handler at
+  insert time, never by the client. Scoring is computed server-side
+  (Postgres function or Next route) when the round closes.
+
+A3. No path validation
+  problem: "path is logged, if someone jumps it's obvious" only helps if you
+  actually check.
+  fix: on finish, a server route validates the path: for each hop A->B,
+  confirm B appears in A's links via
+  api.php?action=query&prop=links&titles=A&pltitles=B&redirects=1.
+  Batch the check (up to 50 titles per request). Invalid path => run marked
+  invalid, 0 points. Cheap, and it's the real anti-cheat.
+
+A4. Redirects break the win condition
+  problem: target is "United States", player lands on "USA" or "U.S." which
+  redirects there. String compare fails and the player is robbed.
+  fix: always request with redirects=1 and compare the canonical
+  parse.title (normalized: underscores -> spaces) against the canonical
+  target title. Canonicalize the target once when the round is created and
+  store it.
+
+A5. Host is a single point of failure
+  problem: host closes the tab and the round never ends / next round never
+  starts.
+  fix: round end is decided by a server-side rule (all runs closed OR
+  started_at + time_limit < now()), evaluated by whichever client notices
+  first via an idempotent "close_round" RPC. If the host is absent from
+  Presence for >20s, the earliest joined_at player is promoted to host.
+
+A6. Random start article can be garbage
+  problem: list pages, disambiguation pages, stubs with 3 links, year pages
+  ("1987 in music") make for miserable rounds.
+  fix: draw random candidates with list=random&rnnamespace=0&rnlimit=20, then
+  filter: not "List of", not a disambiguation page (pageprops=disambiguation),
+  has >= 25 outgoing links, length > 3000 bytes. Take the first survivor.
+
+A7. Target pool reachability was assumed, not verified
+  fix: pre-compute offline. A one-off script BFSes from a sample of random
+  articles to each candidate target and records the shortest-path length.
+  Store as a static JSON of good (start -> target) pairs and difficulty
+  tiers. Fall back to random start + hub target only if the pool runs out.
+  See section C.
+
+A8. Scoring formula has an unbounded-player problem
+  problem: 20 players, everyone past 3rd gets a flat 25. Weak incentive to
+  keep playing once the podium is gone, and "first" is pure speed with no
+  reward for a clever short path.
+  fix: see section D for the revised scoring.
+
+A9. ctrl+F "disabling" is unreliable and annoying
+  problem: you cannot reliably block the browser's find; on mobile it's
+  impossible. Overriding keys just breaks accessibility.
+  fix: drop it as a rule. Instead: (1) log tab-visibility changes
+  (visibilitychange) and show a small "left tab N times" badge on the
+  results screen, social pressure is enough for friends; (2) path validation
+  from A3; (3) a minimum-plausible-time check (a 6-click path in <4s is
+  flagged).
+
+A10. Back button semantics undefined
+  fix: an in-app "Back" button exists (undoes to the previous article) and
+  each use counts as a click. Browser back/forward are trapped with
+  history.pushState so they can't be used to bypass the count.
+
+A11. Player identity / auth is missing
+  problem: players table has no link to a real user, and RLS can't work
+  without one.
+  fix: Supabase Anonymous Sign-In. On first visit ask for a display name,
+  sign in anonymously, insert players row with id = auth.uid(). Persisted
+  in the browser, so stats survive across sessions on that device. Optional
+  later: upgrade to email/OAuth to keep stats across devices.
+
+A12. Row Level Security not mentioned
+  fix: enable RLS on every table. Rules: anyone authenticated can read games
+  they're a member of; only the player can insert/update their own run;
+  only the host (or the close_round RPC, SECURITY DEFINER) can change game
+  status; scores are only ever written by server-side functions.
+
+A13. Wikipedia API etiquette
+  fix: send an Api-User-Agent header identifying the app; cache parsed
+  articles in an in-memory Map (title -> sanitized HTML) and prefetch
+  the start article during the 3-2-1 countdown. 20 players hitting the
+  API is fine, but cache anyway.
+
+A14. Sanitizing HTML with a hand-rolled remove-list is an XSS risk
+  fix: run the Wikipedia HTML through DOMPurify (allow-list tags/attrs,
+  forbid script/iframe/on*), THEN apply the remove-selector pass and link
+  rewriting. Better than trusting the source.
+
+A15. Mobile is the real target
+  fix: friends will join from phones via a WhatsApp link. Design mobile
+  first: wide tables and infoboxes get overflow-x:auto, images capped to
+  100% width, the header (target, clicks, timer) sticks to the top.
+  Collapse infoboxes by default on small screens.
+
+A16. player_stats as a table will drift
+  fix: make it a SQL view (or materialized view refreshed at game end) over
+  runs, so it can't get out of sync. Add score to runs.
+
+--------------------------------------------------------------------------
+B. SCHEMA CHANGES
+--------------------------------------------------------------------------
+
+players            + auth_user_id (uuid, = auth.uid()), + avatar_emoji (text),
+                     + color (text) for progress sidebar
+games              + mode (enum: classic / impossible / speed / daily),
+                     + settings (jsonb: time limit, ban list, difficulty)
+game_players       + is_host (bool), + total_score (int), + connected_at
+rounds             + start_canonical, + target_canonical (post-redirect),
+                     + par_clicks (int, optimal path length if known),
+                     + difficulty (int 1-3), + optimal_path (text[], nullable)
+runs               + score (int), + valid (bool, default true),
+                     + tab_switches (int), + duration_ms (int, server-computed),
+                     + status (enum: playing / finished / gave_up / timed_out)
+NEW banned_titles  (game_id, title) -> per-game "hub ban list", see C3
+NEW pairs          (id, start, target, shortest_len, difficulty, tags[]) -> the
+                     pre-verified pool from A7
+VIEW player_stats  computed from runs (see A16)
+
+--------------------------------------------------------------------------
+C. BETTER PAIR GENERATION
+--------------------------------------------------------------------------
+
+C1. Difficulty tiers instead of one "sweet spot"
+   easy   = shortest path 3-4   (warm-up round 1)
+   medium = 5-6                 (default)
+   hard   = 7-9                 (final round)
+   Host picks a difficulty curve: "ramp up" (default) makes round 1 easy and
+   the last round hard.
+
+C2. Themed rounds (uses tags on pairs)
+   "sports", "history", "science", "geography", "pop culture". Host can
+   pick a theme for the game, or "mixed". Makes it feel curated, not random.
+
+C3. Hub ban list
+   The classic exploit is going through "United States" / "Wikipedia" /
+   "Geographic coordinate system" every time. Each round auto-bans the top
+   ~10 mega-hubs (unless they are the target). Banned links render greyed
+   and unclickable. This alone raises the skill ceiling a lot.
+
+C4. Show the target properly
+   Header shows target title + first-sentence extract
+   (action=query&prop=extracts&exintro&exsentences=1) so people know what
+   they are aiming for and can navigate by concept instead of guessing.
+
+C5. Post-round reveal
+   After the round, show the optimal path (from the offline BFS) next to
+   the fastest human path. "You took 9 clicks, optimal was 4" is the bit
+   people screenshot and argue about.
+
+--------------------------------------------------------------------------
+D. REVISED SCORING
+--------------------------------------------------------------------------
+
+Two things matter: speed and efficiency. Reward both, not just first place.
+
+  speed points      = rank-based, scaled to player count N:
+                      100 * (N - rank + 1) / N   (first gets 100, last finisher
+                      gets 100/N, never zero if you finished)
+  efficiency bonus  = up to +40: 40 * max(0, 1 - (clicks - par) / par)
+                      (hitting par = full 40, 2x par = 0)
+  time bonus        = timeLeft / timeLimit * 20
+  DNF / gave up     = 0
+  invalid path      = 0
+  tiebreakers       = earlier finished_at (server time), then fewer clicks
+
+Why: with 20 players the old "top 3 only" ladder makes most people feel
+irrelevant. Rank-scaled points keep everyone finishing in the game. The
+efficiency bonus gives a slow-but-clever player a way to beat a lucky
+fast one.
+
+Also add a per-game "clicks only" option (fewest clicks wins, time is only
+a tiebreaker) for people who hate the time pressure.
+
+--------------------------------------------------------------------------
+E. REVISED REALTIME FLOW (changes only)
+--------------------------------------------------------------------------
+
+LOBBY
+  - shareable link https://app/game/ABCD plus a "copy for WhatsApp" button
+  - join by link with just a name, no signup (anonymous auth, A11)
+  - host settings: rounds, difficulty curve, theme, time limit, mode
+  - Presence carries { name, emoji, ready }; host can start when >= 2 ready
+
+ROUND START (new: synchronized start)
+  1. host calls start_round RPC -> DB inserts round with started_at =
+     now() + 5s (a future timestamp)
+  2. Broadcast 'round-start' with { roundId, startsAt } as a ping
+  3. all clients fetch the round row, prefetch the start article, and show a
+     3-2-1 countdown driven by (startsAt - serverNow). Compute clock skew
+     from a tiny RPC that returns server time. Nobody gets a head start.
+
+DURING ROUND
+  - clicks are broadcast (progress sidebar) AND buffered locally; the path is
+    only written to DB on finish/give-up/timeout via a submit_run RPC, which
+    validates (A3) and scores. Keeps DB writes at ~1 per player per round.
+  - sidebar shows other players' click COUNT and progress, but hides
+    article names until round end (so nobody just follows the leader).
+    Optional "reveal mode" setting for casual play.
+
+ROUND END
+  - close_round RPC (idempotent) computes scores, writes them, sets status
+  - Broadcast 'round-end' is only a ping, clients read results from DB
+  - results screen: podium, every path as a chain of chips, optimal path,
+    "left the tab" badges, 10s auto-advance with a host "skip" button
+
+--------------------------------------------------------------------------
+F. NEW FEATURE IDEAS (ranked by fun-per-effort)
+--------------------------------------------------------------------------
+
+Cheap + high fun (do in v1.5):
+  1. Emoji reactions during results (broadcast only, no DB).
+  2. Live "race track" strip: each player is a coloured dot whose position
+     reflects clicks vs par. Cosmetic, but makes spectating exciting.
+  3. Hub ban list (C3) and target extract (C4), nearly free.
+  4. Optimal path reveal (C5).
+  5. Player colours/emoji for identity in the sidebar.
+
+Medium effort:
+  6. Daily challenge: one shared pair per day (seeded by date), one attempt
+     each, global daily leaderboard. Gives people a reason to open the app
+     when no game is running.
+  7. Replay: scrub through anyone's path with timestamps (needs per-click
+     timestamps in runs.path as jsonb [{title, t}] instead of text[]).
+  8. Spectator mode (already in v2): join a room read-only via the same
+     Broadcast channel.
+  9. Achievements: "Hub Hater" (win without touching a top-10 hub), "Par
+     Buster" (beat the BFS optimal with a shorter path), "Phoenix" (win
+     after being last at midpoint), "Speedrun" (<20s).
+
+Bigger swings (v3):
+  10. Team mode: 2v2/3v3, shared click budget or relay (players alternate
+      clicks).
+  11. Blind mode: target title hidden; only hints shown, one more revealed
+      every 45s.
+  12. Handicap mode: previous round's winner gets +1 banned hub, last place
+      gets a "skip one article" token. Balances mixed-skill groups.
+  13. Cross-language mode (start in one Wikipedia language edition, target
+      in another via langlinks).
+  14. Sabotage: round winner bans a link category for everyone next round.
+
+--------------------------------------------------------------------------
+G. BUILD ORDER (each step is playable/demoable on its own)
+--------------------------------------------------------------------------
+
+Milestone 1: Single-player core (no Supabase)
+  - WikiPage renderer with DOMPurify + link rewriting + redirect canonical
+  - random start filter (A6) + hub target pool, click counter, timer,
+    win detection, give-up, in-app back
+  - runs on localhost; proves the rendering (the riskiest part) works
+
+Milestone 2: Rooms + realtime
+  - Supabase project, anonymous auth, RLS, schema
+  - create/join room, Presence lobby, host controls
+  - synchronized round start, Broadcast progress sidebar
+  - state recovery on refresh/reconnect (A1)
+
+Milestone 3: Scoring + integrity
+  - submit_run / close_round RPCs, server timestamps, path validation (A3)
+  - revised scoring (D), results screen, multi-round game loop, final
+    leaderboard, host takeover (A5)
+
+Milestone 4: Persistence + polish
+  - player_stats view, /leaderboard, /history
+  - mobile pass (A15), shareable results card, WhatsApp link
+
+Milestone 5: Content quality
+  - offline BFS pair generator, difficulty tiers, themes, hub ban list,
+    optimal path reveal (section C)
+
+Milestone 6: v2 features from section F, picked by what your friends
+  actually ask for after playing.
+
+--------------------------------------------------------------------------
+H. RISKS AND OPEN QUESTIONS
+--------------------------------------------------------------------------
+
+  - Wikipedia HTML changes / weird pages (math-heavy, tables) may render
+    badly. Mitigation: test 50 random articles in milestone 1 and keep a
+    list of selectors to strip.
+  - Supabase Realtime free tier limits (concurrent connections, messages per
+    second). 20 players clicking every few seconds should be well within
+    it, but confirm current limits before launch.
+  - Offline BFS needs many Wikipedia API calls; run it slowly, respect rate
+    limits, or use Wikipedia clickstream/dump data instead.
+  - Decision needed: does the sidebar show article names live (easier to
+    follow the leader) or counts only? Default above: counts only, as a
+    host setting.
+  - Decision needed: is backtracking free or does it cost a click? Default
+    above: costs a click.
+  - Decision needed: English Wikipedia only for v1? (Recommended: yes.)
+  - Decision needed: stats per device (anonymous auth) or require accounts?
+    Default: anonymous now, optional upgrade later.

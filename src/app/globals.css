@@ -1,0 +1,237 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --ink: #101828;
+  --muted: #667085;
+  --line: #d0d5dd;
+  --signal: #2f5bff;
+  --signal-ink: #ffffff;
+  --sun: #ffc93c;
+  --sun-ink: #101828;
+  --go: #12a150;
+  --stop: #e5484d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c111d;
+    --surface: #131a2a;
+    --ink: #f2f4f7;
+    --muted: #98a2b3;
+    --line: #2a3348;
+    --signal: #7a97ff;
+    --signal-ink: #0c111d;
+    --go: #34c77b;
+    --stop: #ff6b6b;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-signal: var(--signal);
+  --color-signal-ink: var(--signal-ink);
+  --color-sun: var(--sun);
+  --color-sun-ink: var(--sun-ink);
+  --color-go: var(--go);
+  --color-stop: var(--stop);
+  --font-sans: var(--font-display);
+  --font-serif: var(--font-serif);
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-display), system-ui, sans-serif;
+}
+
+@layer base {
+  :focus-visible {
+    outline: 3px solid var(--signal);
+    outline-offset: 2px;
+  }
+}
+
+/* One deliberate motion: a train dot running the line while a round loads. */
+@keyframes run-line {
+  from {
+    left: 0;
+  }
+  to {
+    left: 100%;
+  }
+}
+.train {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 9999px;
+  background: var(--signal);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--signal) 25%, transparent);
+  animation: run-line 1.6s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .train {
+    animation: none;
+    left: 50%;
+  }
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Wikipedia article content, styled without Wikipedia's own CSS. */
+.wiki-content {
+  font-family: var(--font-serif), Georgia, serif;
+  line-height: 1.75;
+  font-size: 1.0625rem;
+  overflow-wrap: anywhere;
+}
+.wiki-content a[data-title] {
+  color: var(--signal);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--signal) 35%, transparent);
+  text-underline-offset: 3px;
+}
+.wiki-content a[data-title]:hover {
+  text-decoration-color: var(--signal);
+  background: color-mix(in srgb, var(--signal) 10%, transparent);
+}
+.wiki-content p {
+  margin: 0.7em 0;
+  max-width: 70ch;
+}
+.wiki-content h2,
+.wiki-content .mw-heading2 {
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 1.6em 0 0.4em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--line);
+}
+.wiki-content h3 {
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.2rem;
+  font-weight: 650;
+  margin: 1.2em 0 0.3em;
+}
+.wiki-content ul {
+  list-style: disc;
+  margin: 0.5em 0 0.5em 1.5em;
+}
+.wiki-content ol {
+  list-style: decimal;
+  margin: 0.5em 0 0.5em 1.5em;
+}
+.wiki-content li {
+  max-width: 70ch;
+}
+.wiki-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+.wiki-content figure {
+  margin: 0.8em 0;
+}
+.wiki-content figcaption,
+.wiki-content .thumbcaption {
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.wiki-content .infobox,
+.wiki-content .thumb,
+.wiki-content .tright {
+  float: right;
+  clear: right;
+  max-width: 300px;
+  margin: 0 0 1em 1.4em;
+}
+.wiki-content .infobox {
+  width: 22em;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  padding: 0.5em;
+}
+.wiki-content table {
+  border-collapse: collapse;
+}
+.wiki-content td,
+.wiki-content th {
+  padding: 0.3em 0.5em;
+  vertical-align: top;
+}
+.wiki-content .wikitable {
+  border: 1px solid var(--line);
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+  font-size: 0.9rem;
+}
+.wiki-content .wikitable td,
+.wiki-content .wikitable th {
+  border: 1px solid var(--line);
+}
+.wiki-content .mw-heading {
+  clear: both;
+}
+.wiki-content .math,
+.wiki-content .mwe-math-element {
+  overflow-x: auto;
+}
+.wiki-content .mwe-math-fallback-image-inline,
+.wiki-content .mwe-math-fallback-image-display {
+  display: inline-block;
+}
+.wiki-content .mw-halign-left {
+  float: left;
+  margin-right: 1em;
+}
+/* Wikipedia math and diagrams are dark-on-transparent images. */
+@media (prefers-color-scheme: dark) {
+  .wiki-content img {
+    background: #ffffff;
+  }
+  .wiki-content .infobox img {
+    background: transparent;
+  }
+}
+
+/* Phones: no floats, infobox goes full width. */
+@media (max-width: 640px) {
+  .wiki-content {
+    font-size: 1rem;
+  }
+  .wiki-content .infobox,
+  .wiki-content .thumb,
+  .wiki-content .tright {
+    float: none;
+    width: 100%;
+    max-width: 100%;
+    margin: 1em 0;
+    overflow: auto;
+  }
+  .wiki-content .infobox {
+    max-height: 14rem;
+  }
+}
