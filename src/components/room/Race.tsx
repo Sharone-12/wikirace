@@ -97,16 +97,16 @@ export function Race({ state, run, now, onRun, onStale }: RaceProps) {
             Round {round.number} of {state.room.roundsTotal} · get ready
           </p>
           <div className="mt-8 grid w-full gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-            <div className="frame rounded-2xl bg-surface p-4 text-left">
+            <div className="frame bg-surface p-4 text-left">
               <div className="kicker text-muted">Start</div>
-              <div className="mt-1 text-xl font-extrabold leading-tight tracking-tight">{round.start}</div>
+              <div className="display mt-1 text-2xl">{round.start}</div>
             </div>
             <span className="text-2xl font-black" aria-hidden="true">
               →
             </span>
-            <div className="frame rounded-2xl bg-sun p-4 text-left">
+            <div className="frame bg-ink p-4 text-left text-white">
               <div className="kicker">Get to</div>
-              <div className="mt-1 text-xl font-black leading-tight tracking-tight">{round.target}</div>
+              <div className="display mt-1 text-2xl">{round.target}</div>
             </div>
           </div>
           {round.targetExtract && (
@@ -115,7 +115,7 @@ export function Race({ state, run, now, onRun, onStale }: RaceProps) {
             </p>
           )}
           <div
-            className="frame mt-10 grid size-40 place-items-center rounded-full bg-ink text-8xl font-black tabular-nums text-white"
+            className="frame mt-10 grid size-40 place-items-center rounded-full bg-ink font-condensed text-8xl font-semibold tabular-nums text-white"
             role="timer"
             aria-live="assertive"
           >

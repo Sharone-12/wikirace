@@ -1,14 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Brand } from "@/components/Brand";
+import { TopBar } from "@/components/Brand";
 import { apiCall } from "@/lib/client/api";
 import { ensureIdentity, loadIdentity } from "@/lib/client/identity";
 
 const select =
-  "frame w-full appearance-none rounded-full bg-bg px-4 py-2.5 font-bold outline-none focus:shadow-[0_0_0_3px_var(--ink)]";
+  "frame w-full appearance-none bg-bg px-4 py-2.5 font-bold outline-none focus:shadow-[4px_4px_0_var(--ink)]";
 
 function Chevron() {
   return (
@@ -72,20 +71,15 @@ export default function Entry() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8">
-      <div className="flex items-start justify-between gap-4">
-        <Brand tagline="multiplayer race" />
-        <Link href="/" className="btn-line px-4 py-2 text-sm">
-          Play solo
-        </Link>
-      </div>
+    <main className="mx-auto w-full max-w-3xl flex-1 px-5 py-6 sm:px-8">
+      <TopBar tagline="multiplayer race" />
 
       <h1 className="display mt-12 text-5xl sm:text-7xl">Race your friends.</h1>
       <p className="mt-5 max-w-[46ch] text-lg text-muted">
         Everyone gets the same start and target. Fewest clicks and fastest time win the round.
       </p>
 
-      <label className="frame mt-10 flex flex-col gap-1.5 rounded-[22px] bg-surface p-4">
+      <label className="frame mt-10 flex flex-col gap-1.5 bg-surface p-4">
         <span className="kicker text-muted">Your name</span>
         <input
           value={name}
@@ -98,14 +92,14 @@ export default function Entry() {
       </label>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <form onSubmit={create} className="frame relative flex flex-col gap-4 rounded-[22px] bg-sun p-5">
+        <form onSubmit={create} className="frame relative flex flex-col gap-4 bg-surface p-5">
           <div className="flex items-start justify-between">
-            <span className="text-[21px] font-extrabold tracking-tight">01</span>
+            <span className="font-condensed text-[21px] font-semibold">01</span>
             <span className="font-bold" aria-hidden="true">
               ↗
             </span>
           </div>
-          <h2 className="-mt-2 text-2xl font-black tracking-tight">New room</h2>
+          <h2 className="display -mt-2 text-3xl">New room</h2>
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1.5">
               <span className="kicker">Rounds</span>
@@ -139,14 +133,14 @@ export default function Entry() {
           </button>
         </form>
 
-        <form onSubmit={join} className="frame flex flex-col gap-4 rounded-[22px] bg-signal p-5 text-white">
+        <form onSubmit={join} className="frame flex flex-col gap-4 bg-ink p-5 text-white">
           <div className="flex items-start justify-between">
-            <span className="text-[21px] font-extrabold tracking-tight">02</span>
+            <span className="font-condensed text-[21px] font-semibold">02</span>
             <span className="font-bold" aria-hidden="true">
               ↗
             </span>
           </div>
-          <h2 className="-mt-2 text-2xl font-black tracking-tight">Join a room</h2>
+          <h2 className="display -mt-2 text-3xl">Join a room</h2>
           <label className="flex flex-col gap-1.5">
             <span className="kicker">Room code</span>
             <input
@@ -163,7 +157,7 @@ export default function Entry() {
           <button
             type="submit"
             disabled={!name.trim() || cleanCode.length !== 4 || busy}
-            className="btn-ink mt-auto"
+            className="btn-ink mt-auto border-white bg-white text-ink"
           >
             Join →
           </button>
@@ -171,7 +165,7 @@ export default function Entry() {
       </div>
 
       {error && (
-        <p role="alert" className="frame mt-4 rounded-2xl bg-stop px-3.5 py-2.5 text-sm font-semibold text-white">
+        <p role="alert" className="frame mt-4 bg-stop px-3.5 py-2.5 text-sm font-semibold text-white">
           {error}
         </p>
       )}

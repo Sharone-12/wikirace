@@ -25,9 +25,9 @@ export function RaceHeader(p: RaceHeaderProps) {
   const low = p.timeLeft <= 30;
 
   return (
-    <header className="sticky top-0 z-10 border-b-[1.5px] border-ink bg-bg/95 backdrop-blur">
+    <header className="sticky top-0 z-10 border-b-[3px] border-ink bg-bg">
       <div
-        className="h-1.5 bg-hair"
+        className="h-2 border-b-2 border-ink bg-bg"
         role="progressbar"
         aria-label="Time left"
         aria-valuemin={0}
@@ -35,7 +35,7 @@ export function RaceHeader(p: RaceHeaderProps) {
         aria-valuenow={p.timeLeft}
       >
         <div
-          className={`h-full transition-[width] duration-300 ease-linear ${low ? "bg-stop" : "bg-ink"}`}
+          className={`h-full transition-[width] duration-300 ease-linear ${low ? "bar-low" : "bg-ink"}`}
           style={{ width: `${(p.timeLeft / p.timeLimit) * 100}%` }}
         />
       </div>
@@ -45,19 +45,19 @@ export function RaceHeader(p: RaceHeaderProps) {
           <button
             onClick={() => setShowExtract((v) => !v)}
             aria-expanded={showExtract}
-            className="frame lift min-w-0 flex-1 rounded-2xl bg-sun px-3.5 py-2 text-left text-sun-ink"
+            className="frame lift min-w-0 flex-1 bg-ink px-3.5 py-2 text-left text-white"
             title="Tap to see what the target is"
           >
             <div className="kicker">Get to ↗</div>
-            <div className="truncate text-xl font-black leading-tight tracking-tight">{p.target}</div>
+            <div className="display truncate text-2xl">{p.target}</div>
           </button>
           <div className="text-right">
-            <div className="text-[32px] font-black leading-none tracking-tighter tabular-nums">{p.clicks}</div>
+            <div className="font-condensed text-[34px] font-semibold leading-none tabular-nums">{p.clicks}</div>
             <div className="kicker mt-1 text-muted">{p.clicks === 1 ? "click" : "clicks"}</div>
           </div>
           <div className="text-right">
             <div
-              className={`text-[32px] font-black leading-none tracking-tighter tabular-nums ${low ? "text-stop" : ""}`}
+              className={`font-condensed text-[34px] font-semibold leading-none tabular-nums ${low ? "bg-ink px-1.5 text-white" : ""}`}
             >
               {mm}:{ss}
             </div>
@@ -66,7 +66,7 @@ export function RaceHeader(p: RaceHeaderProps) {
         </div>
 
         {showExtract && p.targetExtract && (
-          <p className="frame mt-2 rounded-2xl bg-surface px-3.5 py-2.5 text-sm leading-relaxed">
+          <p className="frame mt-2 bg-surface px-3.5 py-2.5 text-sm leading-relaxed">
             {p.targetExtract}
           </p>
         )}
@@ -83,7 +83,7 @@ export function RaceHeader(p: RaceHeaderProps) {
           <Trail path={p.path} target={p.target} />
           <button
             onClick={p.onGiveUp}
-            className="btn-line shrink-0 text-sm text-stop hover:!bg-stop hover:!text-white"
+            className="btn-line shrink-0 text-sm"
           >
             Give up
           </button>
@@ -107,7 +107,7 @@ export function ArticleView({ title, html, busy, error, onLink }: ArticleViewPro
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6" aria-busy={busy}>
       {error && (
-        <p role="alert" className="frame mb-4 rounded-2xl bg-stop px-3.5 py-2.5 text-sm font-semibold text-white">
+        <p role="alert" className="frame mb-4 bg-stop px-3.5 py-2.5 text-sm font-semibold text-white">
           {error}
         </p>
       )}

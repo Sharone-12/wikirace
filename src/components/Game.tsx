@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BlockLink, Brand } from "@/components/Brand";
+import { TopBar } from "@/components/Brand";
+import { HeroScene } from "@/components/Doodles";
 import { ArticleView, RaceHeader } from "@/components/RaceHeader";
-import { LineDemo, RouteMap } from "@/components/RouteLine";
+import { RouteMap } from "@/components/RouteLine";
 import { pickTarget } from "@/lib/targets";
 import {
   describeCloseness,
@@ -49,6 +50,7 @@ export default function Game() {
   const [closenessFailed, setClosenessFailed] = useState(false);
   const [startCloseness, setStartCloseness] = useState<Closeness | null>(null);
 
+  const nameRef = useRef<HTMLInputElement>(null);
   const startedAt = useRef(0);
   const targetCanon = useRef("");
   // Start closeness, measured in the background while the round is played.
@@ -175,58 +177,69 @@ export default function Game() {
   if (phase === "name" || phase === "loading") {
     const loading = phase === "loading";
     return (
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6 py-8">
-        <Brand />
-        <div className="flex flex-1 flex-col justify-center py-10">
-          <h1 className="display text-5xl sm:text-7xl">
-            Get from here to there, one link at a time.
-          </h1>
-          <p className="mt-6 max-w-[46ch] text-lg text-muted">
-            You start on a random Wikipedia article. Reach the target using only the links on the
-            page. You have {TIME_LIMIT / 60} minutes.
-          </p>
+      <main className="flex w-full flex-1 flex-col">
+        <div className="px-5 pt-5 sm:px-8 sm:pt-6">
+          <TopBar />
+        </div>
+        <div className="mx-auto mt-4 w-full max-w-6xl px-4 sm:px-8">
+          <HeroScene running={loading} />
+        </div>
 
-          <LineDemo running={loading} />
+        <div className="mx-auto flex w-full max-w-2xl flex-col items-center px-5 pb-12 pt-8 text-center sm:px-8">
+          <h1 className="display text-4xl sm:text-6xl">
+            From here to there,
+            <br />
+            one link at a time.
+          </h1>
+          <p className="mt-4 max-w-[46ch] text-lg text-muted">
+            Start on a random Wikipedia article. Reach the target using only the links on the page,
+            in {TIME_LIMIT / 60} minutes.
+          </p>
 
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              if (!name.trim()) {
+                setError("Pick a name to race under first.");
+                nameRef.current?.focus();
+                return;
+              }
               startRound();
             }}
-            className="frame flex flex-col gap-3 rounded-[22px] bg-surface p-4 sm:flex-row sm:items-end"
+            className="mt-8 flex w-full flex-col items-center gap-4"
           >
-            <label className="flex flex-1 flex-col gap-1.5">
+            <label className="flex w-full max-w-sm flex-col gap-1.5 text-left">
               <span className="kicker text-muted">Your name</span>
               <input
+                ref={nameRef}
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setError(null);
+                }}
                 maxLength={20}
-                autoFocus
                 autoComplete="nickname"
                 disabled={loading}
-                className="field text-lg"
+                className="field text-center text-lg"
               />
             </label>
-            <button type="submit" disabled={!name.trim() || loading} className="btn-ink text-base">
-              {loading ? "Finding your route..." : "Start racing →"}
-            </button>
+            <div className="grid w-full max-w-md grid-cols-2 gap-3">
+              <button type="submit" disabled={loading} className="btn-ink py-4 text-lg">
+                {loading ? "Loading..." : "Solo →"}
+              </button>
+              <Link href="/play" className="btn-line py-4 text-lg">
+                Multiplayer ↗
+              </Link>
+            </div>
           </form>
           {error && (
-            <p role="alert" className="frame mt-3 rounded-2xl bg-stop px-3.5 py-2.5 text-sm font-semibold text-white">
+            <p role="alert" className="frame mt-4 bg-stop px-3.5 py-2.5 text-sm font-semibold text-white">
               {error}
             </p>
           )}
-
-          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div className="flex min-h-24 flex-col justify-between rounded-2xl bg-sun p-3.5 shadow-[inset_0_0_0_2.5px_var(--ink)]">
-              <span className="text-[21px] font-extrabold tracking-tight">01</span>
-              <span className="text-sm font-bold leading-tight">Solo race</span>
-            </div>
-            <BlockLink href="/play" n="02" label="Race your friends" color="bg-signal text-white" />
-            <p className="col-span-2 border-l-[3px] border-ink pl-3.5 text-sm leading-relaxed text-muted sm:col-span-1 sm:self-center">
-              Going back costs a click. Fewer clicks and more time left score higher.
-            </p>
-          </div>
+          <p className="kicker mt-6 text-muted">
+            Going back costs a click · fewer clicks and more time left score higher
+          </p>
         </div>
       </main>
     );
@@ -240,8 +253,8 @@ export default function Game() {
 
     const headline = won ? `${name} made it.` : outcome === "gave-up" ? "Stopped short." : "Out of time.";
     return (
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8">
-        <Brand />
+      <main className="mx-auto w-full max-w-3xl flex-1 px-5 py-6 sm:px-8">
+        <TopBar />
         <p className="kicker mt-10 text-muted">
           Solo race · {path[0]} → {target}
         </p>
@@ -256,8 +269,8 @@ export default function Game() {
 
         <section className="mt-8 grid gap-3 sm:grid-cols-3" aria-live="polite">
           <div
-            className={`frame flex min-h-28 flex-col justify-between rounded-2xl p-4 ${
-              score ? (won ? "bg-go text-white" : "bg-sun") : "bg-surface"
+            className={`frame flex min-h-28 flex-col justify-between p-4 ${
+              score ? "bg-ink text-white" : "bg-surface"
             }`}
           >
             <span className="kicker">Your score</span>
@@ -266,7 +279,7 @@ export default function Game() {
                 {score.total}
               </span>
             ) : closenessFailed ? (
-              <span role="alert" className="text-sm font-semibold text-stop">
+              <span role="alert" className="text-sm font-semibold">
                 Couldn&apos;t measure it: Wikipedia didn&apos;t respond.
               </span>
             ) : (
@@ -274,12 +287,12 @@ export default function Game() {
             )}
             <span className="text-xs font-semibold opacity-75">{won ? "finished" : "by closeness"}</span>
           </div>
-          <div className="frame flex min-h-28 flex-col justify-between rounded-2xl bg-signal p-4 text-white">
+          <div className="frame flex min-h-28 flex-col justify-between bg-surface p-4">
             <span className="kicker">Clicks</span>
             <span className="text-5xl font-black leading-none tracking-tighter tabular-nums">{clicks}</span>
-            <span className="text-xs font-semibold opacity-75">back counts as one</span>
+            <span className="text-xs font-semibold text-muted">back counts as one</span>
           </div>
-          <div className="frame flex min-h-28 flex-col justify-between rounded-2xl bg-surface p-4">
+          <div className="frame flex min-h-28 flex-col justify-between bg-surface p-4">
             <span className="kicker">Time</span>
             <span className="text-5xl font-black leading-none tracking-tighter tabular-nums">
               {Math.round(elapsed)}
@@ -296,10 +309,10 @@ export default function Game() {
         )}
 
         {score && (
-          <section className="frame mt-5 overflow-hidden rounded-[22px] bg-surface">
-            <div className="flex items-center gap-2.5 border-b-[1.5px] border-ink px-5 py-3.5">
-              <span className="size-[11px] rounded-[3px] bg-sun" />
-              <h2 className="text-[15px] font-extrabold tracking-tight">Score breakdown</h2>
+          <section className="frame mt-5 overflow-hidden bg-surface">
+            <div className="flex items-center gap-2.5 border-b-2 border-ink px-5 py-3.5">
+              <span className="size-[11px] bg-ink" />
+              <h2 className="display text-lg tracking-[0.06em]">Score breakdown</h2>
             </div>
             <ul className="px-5 py-2 text-sm">
               {score.parts.map((p) => (
@@ -317,10 +330,10 @@ export default function Game() {
           </section>
         )}
 
-        <section className="frame mt-5 overflow-hidden rounded-[22px] bg-surface">
-          <div className="flex items-center gap-2.5 border-b-[1.5px] border-ink px-5 py-3.5">
-            <span className="size-[11px] rounded-[3px] bg-signal" />
-            <h2 className="text-[15px] font-extrabold tracking-tight">Your route</h2>
+        <section className="frame mt-5 overflow-hidden bg-surface">
+          <div className="flex items-center gap-2.5 border-b-2 border-ink px-5 py-3.5">
+            <span className="size-[11px] bg-ink" />
+            <h2 className="display text-lg tracking-[0.06em]">Your route</h2>
             <span className="kicker ml-auto text-muted">
               {path.length} stop{path.length === 1 ? "" : "s"}
             </span>

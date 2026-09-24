@@ -234,7 +234,7 @@ export default function Room({ code: rawCode }: { code: string }) {
     return (
       <RoomShell code={code}>
         <h1 className="display mt-12 text-5xl">Can&apos;t open this room.</h1>
-        <p role="alert" className="frame mt-6 rounded-2xl bg-stop px-4 py-3 font-semibold text-white">
+        <p role="alert" className="frame mt-6 bg-stop px-4 py-3 font-semibold text-white">
           {fatal ?? "Something went wrong."}
         </p>
         <Link href="/play" className="btn-ink mt-8 text-base">
@@ -298,7 +298,7 @@ function NameGate({ code, onReady }: { code: string; onReady: (id: Identity) => 
       <h1 className="display mt-2 text-5xl sm:text-6xl">Join the race.</h1>
       <form
         onSubmit={submit}
-        className="frame mt-8 flex flex-col gap-3 rounded-[22px] bg-surface p-4 sm:flex-row sm:items-end"
+        className="frame mt-8 flex flex-col gap-3 bg-surface p-4 sm:flex-row sm:items-end"
       >
         <label className="flex flex-1 flex-col gap-1.5">
           <span className="kicker text-muted">Your name</span>
@@ -317,7 +317,7 @@ function NameGate({ code, onReady }: { code: string; onReady: (id: Identity) => 
         </button>
       </form>
       {error && (
-        <p role="alert" className="frame mt-3 rounded-2xl bg-stop px-3.5 py-2.5 text-sm font-semibold text-white">
+        <p role="alert" className="frame mt-3 bg-stop px-3.5 py-2.5 text-sm font-semibold text-white">
           {error}
         </p>
       )}

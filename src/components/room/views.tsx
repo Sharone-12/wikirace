@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Brand } from "@/components/Brand";
+import { TopBar } from "@/components/Brand";
 import { RouteMap } from "@/components/RouteLine";
 import {
   liveOrder,
@@ -17,7 +17,7 @@ import type { RoomState, RunView } from "@/lib/room-types";
 function Notice({ text }: { text: string | null }) {
   if (!text) return null;
   return (
-    <p role="alert" className="frame mt-3 rounded-2xl bg-stop px-3.5 py-2.5 text-sm font-semibold text-white">
+    <p role="alert" className="frame mt-3 bg-stop px-3.5 py-2.5 text-sm font-semibold text-white">
       {text}
     </p>
   );
@@ -30,24 +30,22 @@ function hostName(state: RoomState) {
 /** Page frame shared by the room screens: brand on the left, room code on the right. */
 export function RoomShell({ code, children }: { code: string; children: React.ReactNode }) {
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8">
-      <div className="flex items-start justify-between gap-4">
-        <Brand tagline="multiplayer race" />
-        <span className="kicker frame rounded-full bg-surface px-3 py-1.5 tracking-[0.2em]">
-          Room {code}
-        </span>
-      </div>
+    <main className="mx-auto w-full max-w-3xl flex-1 px-5 py-6 sm:px-8">
+      <TopBar
+        tagline="multiplayer race"
+        right={<span className="kicker frame bg-ink px-3 py-1.5 tracking-[0.2em] text-white">Room {code}</span>}
+      />
       {children}
     </main>
   );
 }
 
-/** Big number block, the mulenet stat card. */
+/** Big number block. */
 function Stat({ k, v, u, color }: { k: string; v: string | number; u: string; color: string }) {
   return (
-    <div className={`frame flex min-h-24 flex-col justify-between rounded-2xl px-4 pb-3.5 pt-3 ${color}`}>
+    <div className={`frame flex min-h-24 flex-col justify-between px-4 pb-3.5 pt-3 ${color}`}>
       <span className="kicker">{k}</span>
-      <span className="text-[32px] font-black leading-none tracking-tighter tabular-nums">{v}</span>
+      <span className="font-condensed text-[36px] font-semibold leading-none tabular-nums">{v}</span>
       <span className="text-[11px] font-semibold opacity-75">{u}</span>
     </div>
   );
@@ -87,7 +85,7 @@ export function Lobby({ state, online, busy, notice, onStart }: LobbyProps) {
             <span
               key={i}
               aria-hidden="true"
-              className="frame grid h-20 w-16 place-items-center rounded-2xl bg-surface text-5xl font-black tracking-tight sm:h-24 sm:w-20 sm:text-6xl"
+              className="frame grid h-20 w-16 place-items-center bg-surface font-condensed text-5xl font-semibold sm:h-24 sm:w-20 sm:text-6xl"
             >
               {ch}
             </span>
@@ -99,9 +97,9 @@ export function Lobby({ state, online, busy, notice, onStart }: LobbyProps) {
       </div>
 
       <div className="mt-8 grid grid-cols-3 gap-3">
-        <Stat k="Rounds" v={roundsTotal} u="then a winner" color="bg-signal text-white" />
-        <Stat k="Minutes" v={timeLimit / 60} u="per round" color="bg-sun" />
-        <Stat k="Players" v={state.players.length} u="in the room" color="bg-go text-white" />
+        <Stat k="Rounds" v={roundsTotal} u="then a winner" color="bg-ink text-white" />
+        <Stat k="Minutes" v={timeLimit / 60} u="per round" color="bg-surface" />
+        <Stat k="Players" v={state.players.length} u="in the room" color="bg-surface" />
       </div>
 
       <div className="mt-5">
@@ -161,7 +159,7 @@ export function Waiting({ state, now }: { state: RoomState; now: number }) {
       <div className="mt-8">
         <Panel
           title={closing ? "Scoring the round" : "Race progress"}
-          color={closing ? "bg-purple" : "bg-sun"}
+          color="bg-ink"
           note={closing ? "measuring routes..." : `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} left`}
         >
           <ul>
@@ -221,15 +219,15 @@ export function Results({ state, busy, notice, onNext, onRematch }: ResultsProps
       <h1 className="display mt-2 text-5xl sm:text-6xl">{over ? "Game over." : "Round results."}</h1>
 
       {over && leader && (
-        <div className="frame mt-6 flex flex-wrap items-end justify-between gap-4 rounded-2xl bg-go p-5 text-white">
+        <div className="frame mt-6 flex flex-wrap items-end justify-between gap-4 bg-ink p-5 text-white">
           <div>
             <div className="kicker opacity-90">Winner</div>
-            <div className="mt-1 text-4xl font-black leading-none tracking-tighter">
+            <div className="display mt-1 text-5xl">
               {iWon ? "You" : leader.name}
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[42px] font-black leading-none tracking-tighter tabular-nums">{leader.total}</div>
+            <div className="font-condensed text-[46px] font-semibold leading-none tabular-nums">{leader.total}</div>
             <div className="kicker opacity-90">points</div>
           </div>
         </div>
@@ -239,7 +237,7 @@ export function Results({ state, busy, notice, onNext, onRematch }: ResultsProps
         {ranked.map((r, i) => {
           const expanded = open === r.playerId;
           return (
-            <li key={r.playerId} className="frame overflow-hidden rounded-2xl bg-surface">
+            <li key={r.playerId} className="frame overflow-hidden bg-surface">
               <button
                 onClick={() => setOpen(expanded ? null : r.playerId)}
                 aria-expanded={expanded}
@@ -247,27 +245,27 @@ export function Results({ state, busy, notice, onNext, onRematch }: ResultsProps
               >
                 <span
                   className={`grid size-9 shrink-0 place-items-center rounded-full text-sm font-black ${
-                    i === 0 ? "bg-sun" : "frame bg-bg"
+                    i === 0 ? "bg-ink text-white" : "frame bg-bg"
                   }`}
                 >
                   {i + 1}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
-                    <span className="truncate text-lg font-extrabold tracking-tight">{nameOf(state, r.playerId)}</span>
+                    <span className="display truncate text-xl">{nameOf(state, r.playerId)}</span>
                     <StatusTag status={r.status} />
                   </span>
                   <span className="mt-0.5 block text-sm text-muted">{runSummary(r, round.target)}</span>
                 </span>
                 <span className="text-right">
-                  <span className="block text-3xl font-black leading-none tracking-tighter tabular-nums">
+                  <span className="block font-condensed text-3xl font-semibold leading-none tabular-nums">
                     {r.score ?? 0}
                   </span>
                   <span className="kicker text-muted">pts {expanded ? "▴" : "▾"}</span>
                 </span>
               </button>
               {expanded && (
-                <div className="grid gap-5 border-t-[1.5px] border-ink bg-bg px-4 py-4 sm:grid-cols-[1fr_1.2fr]">
+                <div className="grid gap-5 border-t-2 border-ink bg-bg px-4 py-4 sm:grid-cols-[1fr_1.2fr]">
                   {r.scoreParts && (
                     <ul className="text-sm">
                       {r.scoreParts.map((p) => (

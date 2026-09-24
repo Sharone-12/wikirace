@@ -1,24 +1,26 @@
 @import "tailwindcss";
 
-/* Paper, ink, and flat colour blocks: the mulenet design language. Every
-   surface is framed with a 1.5px ink line; colour is used as solid fills
-   with ink text on top, never as gradients. */
+/* Pen and paper: a hand-inked, strictly monochrome look. The whole page sits
+   in one heavy ink frame; surfaces are white with ink lines, emphasis is a
+   solid ink fill with white type. The old colour names are kept as aliases
+   so every "block" resolves to either paper or ink. */
 :root {
-  --bg: #f0ebe5; /* paper */
-  --surface: #fbf8f5; /* card */
+  --page: #f1f0ec; /* outside the frame */
+  --bg: #ffffff; /* paper inside the frame */
+  --surface: #ffffff;
   --ink: #0a0a0a;
-  --muted: #6b655e;
+  --muted: #5c5c5c;
   --line: #0a0a0a;
-  --hair: rgba(10, 10, 10, 0.16); /* quiet separators and tracks */
+  --hair: rgba(10, 10, 10, 0.18);
 
-  --signal: #1668e3; /* blue */
+  --signal: var(--ink);
   --signal-ink: #ffffff;
-  --sun: #ffb400; /* amber */
-  --sun-ink: #0a0a0a;
-  --go: #00a94f; /* green */
-  --stop: #e8412f; /* red */
-  --orange: #ff5b22;
-  --purple: #a855f7;
+  --sun: #ffffff;
+  --sun-ink: var(--ink);
+  --go: var(--ink);
+  --stop: var(--ink);
+  --orange: var(--ink);
+  --purple: var(--ink);
 }
 
 @theme inline {
@@ -38,10 +40,12 @@
   --color-purple: var(--purple);
   --font-sans: var(--font-display);
   --font-serif: var(--font-serif);
+  --font-condensed: var(--font-condensed);
+  --font-script: var(--font-script);
 }
 
 body {
-  background: var(--bg);
+  background: var(--page);
   color: var(--ink);
   font-family: var(--font-display), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -53,45 +57,82 @@ body {
     outline-offset: 2px;
   }
   ::selection {
-    background: var(--sun);
-    color: var(--ink);
+    background: var(--ink);
+    color: #fff;
+  }
+}
+
+/* The page itself: one heavy ink frame inset from the window edge. */
+.site {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  margin: 10px;
+  min-height: calc(100dvh - 20px);
+  border: 3px solid var(--line);
+  background: var(--bg);
+}
+@media (min-width: 640px) {
+  .site {
+    margin: 20px;
+    min-height: calc(100dvh - 40px);
   }
 }
 
 /* A framed surface: the ink outline everything in this UI sits in. */
 @utility frame {
-  border: 1.5px solid var(--line);
+  border: 2px solid var(--line);
 }
 
 /* Small uppercase label above a value or section. */
 @utility kicker {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
+  font-family: var(--font-condensed), var(--font-display), sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
-/* Heavy display type with the tight tracking of the mulenet headings. */
+/* Condensed uppercase headings, like a hand-lettered menu board. */
 @utility display {
-  font-weight: 900;
-  letter-spacing: -0.045em;
-  line-height: 0.98;
+  font-family: var(--font-condensed), var(--font-display), sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.005em;
+  line-height: 1.02;
 }
 
-/* Primary action: a solid ink pill. */
+/* Top-right navigation: small, bold, uppercase. */
+@utility nav-link {
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  text-underline-offset: 5px;
+  text-decoration-thickness: 2px;
+  &:hover {
+    text-decoration-line: underline;
+  }
+}
+
+/* Primary action: a solid ink block with condensed caps. */
 @utility btn-ink {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border-radius: 999px;
+  border: 2px solid var(--ink);
   background: var(--ink);
   color: #fff;
-  font-weight: 700;
-  padding: 0.85rem 1.6rem;
-  transition: transform 0.15s ease, opacity 0.15s ease;
+  font-family: var(--font-condensed), var(--font-display), sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.8rem 1.6rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
   &:hover:not(:disabled) {
-    transform: translateY(-2px);
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 var(--ink);
   }
   &:disabled {
     opacity: 0.35;
@@ -99,16 +140,18 @@ body {
   }
 }
 
-/* Secondary action: an outlined pill that fills with ink on hover. */
+/* Secondary action: an outlined block that fills with ink on hover. */
 @utility btn-line {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  border-radius: 999px;
-  border: 1.5px solid var(--line);
-  background: transparent;
-  font-weight: 600;
+  border: 2px solid var(--line);
+  background: var(--bg);
+  font-family: var(--font-condensed), var(--font-display), sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   padding: 0.4rem 0.9rem;
   transition: background 0.15s ease, color 0.15s ease;
   &:hover:not(:disabled) {
@@ -121,19 +164,19 @@ body {
   }
 }
 
-/* Colour-block card that lifts on hover, like the mulenet nav cards. */
+/* A card that lifts off the page with a hard ink shadow on hover. */
 @utility lift {
-  transition: transform 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
   &:hover {
-    transform: translateY(-2px);
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 var(--ink);
   }
 }
 
 /* Inputs sit on paper inside an ink frame. */
 @utility field {
   width: 100%;
-  border: 1.5px solid var(--line);
-  border-radius: 999px;
+  border: 2px solid var(--line);
   background: var(--bg);
   color: var(--ink);
   padding: 0.75rem 1.1rem;
@@ -143,7 +186,7 @@ body {
     color: var(--muted);
   }
   &:focus {
-    box-shadow: 0 0 0 3px var(--sun);
+    box-shadow: 4px 4px 0 var(--ink);
   }
   &:disabled {
     opacity: 0.6;
@@ -162,31 +205,29 @@ body {
   border-radius: 5px;
 }
 
-/* One deliberate motion: a train dot running the line while a round loads. */
-@keyframes run-line {
-  from {
-    left: 0;
-  }
+/* One deliberate motion: the dashed route in the landscape marches toward
+   the flag while a round loads. */
+@keyframes march {
   to {
-    left: 100%;
+    stroke-dashoffset: -48;
   }
 }
-.train {
-  position: absolute;
-  top: 50%;
-  width: 14px;
-  height: 14px;
-  margin: -7px 0 0 -7px;
-  border-radius: 9999px;
-  background: var(--ink);
-  box-shadow: 0 0 0 4px var(--sun);
-  animation: run-line 1.6s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+.route-run {
+  animation: march 0.8s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .train {
+  .route-run {
     animation: none;
-    left: 50%;
   }
+}
+
+/* Time bar when it's nearly out: hatched instead of solid, since there's no red. */
+.bar-low {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--ink) 0 6px,
+    transparent 6px 10px
+  );
 }
 
 .hide-scrollbar {
@@ -204,16 +245,18 @@ body {
   overflow-wrap: anywhere;
 }
 .wiki-content a[data-title] {
-  color: var(--signal);
+  color: var(--ink);
+  font-weight: 600;
   cursor: pointer;
   text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--signal) 40%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--ink) 45%, transparent);
   text-decoration-thickness: 1.5px;
   text-underline-offset: 3px;
 }
 .wiki-content a[data-title]:hover {
-  text-decoration-color: var(--signal);
-  background: color-mix(in srgb, var(--sun) 45%, transparent);
+  background: var(--ink);
+  color: #fff;
+  text-decoration-color: var(--ink);
 }
 .wiki-content p {
   margin: 0.7em 0;
@@ -221,19 +264,21 @@ body {
 }
 .wiki-content h2,
 .wiki-content .mw-heading2 {
-  font-family: var(--font-display), sans-serif;
+  font-family: var(--font-condensed), var(--font-display), sans-serif;
   font-size: 1.5rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
   margin: 1.6em 0 0.4em;
   padding-bottom: 0.25em;
-  border-bottom: 1.5px solid var(--line);
+  border-bottom: 2px solid var(--line);
 }
 .wiki-content h3 {
-  font-family: var(--font-display), sans-serif;
+  font-family: var(--font-condensed), var(--font-display), sans-serif;
   font-size: 1.2rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   margin: 1.2em 0 0.3em;
 }
 .wiki-content ul {
@@ -250,7 +295,7 @@ body {
 .wiki-content img {
   max-width: 100%;
   height: auto;
-  border-radius: 6px;
+  filter: grayscale(1) contrast(1.1);
 }
 .wiki-content figure {
   margin: 0.8em 0;
@@ -273,8 +318,7 @@ body {
 .wiki-content .infobox {
   width: 22em;
   background: var(--surface);
-  border: 1.5px solid var(--line);
-  border-radius: 16px;
+  border: 2px solid var(--line);
   font-family: var(--font-display), sans-serif;
   font-size: 0.85rem;
   line-height: 1.45;
@@ -289,7 +333,7 @@ body {
   vertical-align: top;
 }
 .wiki-content .wikitable {
-  border: 1.5px solid var(--line);
+  border: 2px solid var(--line);
   display: block;
   overflow-x: auto;
   max-width: 100%;

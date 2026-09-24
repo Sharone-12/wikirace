@@ -40,24 +40,24 @@ export function resultOrder(runs: RunView[]): RunView[] {
   return [...runs].sort((a, b) => compareResults(key(a), key(b)));
 }
 
-/** Colour for a run's outcome, used on tags and chips. */
+/** Fill for a run's outcome, used on tags and chips: ink for made it, dashed for didn't. */
 export const STATUS_FILL: Record<RunStatus, string> = {
   playing: "bg-surface",
-  finished: "bg-go text-white",
-  gave_up: "bg-bg text-muted",
-  timed_out: "bg-stop text-white",
+  finished: "bg-ink text-white",
+  gave_up: "bg-bg text-muted border-dashed",
+  timed_out: "bg-bg text-muted border-dashed",
 };
 
 /** Small uppercase pill naming how a run is going or ended. */
 export function StatusTag({ status }: { status: RunStatus }) {
   return (
-    <span className={`kicker frame shrink-0 rounded-full px-2 py-0.5 text-[9.5px] ${STATUS_FILL[status]}`}>
+    <span className={`kicker frame shrink-0 px-2 py-0.5 text-[9.5px] ${STATUS_FILL[status]}`}>
       {STATUS_TEXT[status]}
     </span>
   );
 }
 
-/** A framed panel with the mulenet header row: colour square, title, uppercase note. */
+/** A framed panel with a header row: ink square, condensed title, uppercase note. */
 export function Panel({
   title,
   note,
@@ -70,10 +70,10 @@ export function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="frame overflow-hidden rounded-[22px] bg-surface">
-      <div className="flex items-center gap-2.5 border-b-[1.5px] border-ink px-5 py-3.5">
-        <span className={`size-[11px] shrink-0 rounded-[3px] ${color}`} />
-        <h2 className="text-[15px] font-extrabold tracking-tight">{title}</h2>
+    <section className="frame overflow-hidden bg-surface">
+      <div className="flex items-center gap-2.5 border-b-2 border-ink px-5 py-3.5">
+        <span className={`size-[11px] shrink-0 ${color}`} />
+        <h2 className="display text-lg tracking-[0.06em]">{title}</h2>
         {note && <span className="kicker ml-auto text-muted">{note}</span>}
       </div>
       {children}
@@ -114,7 +114,7 @@ export function Standings({
   return (
     <Panel
       title={title}
-      color="bg-go"
+      color="bg-ink"
       note={here !== null ? `${here} online` : `${players.length} player${players.length === 1 ? "" : "s"}`}
     >
       <ol>
@@ -123,7 +123,7 @@ export function Standings({
             <span className="kicker w-6 tabular-nums text-muted">{String(i + 1).padStart(2, "0")}</span>
             {online && (
               <span
-                className={`size-2 shrink-0 rounded-full ${online.has(p.id) ? "bg-go" : "bg-stop"}`}
+                className={`size-2.5 shrink-0 rounded-full border-2 border-ink ${online.has(p.id) ? "bg-ink" : "bg-bg"}`}
                 title={online.has(p.id) ? "Online" : "Away"}
               />
             )}
@@ -132,7 +132,7 @@ export function Standings({
               {p.id === state.me && <span className="font-medium text-muted"> (you)</span>}
             </span>
             {p.id === state.room.hostId && (
-              <span className="kicker frame rounded-full bg-sun px-2 py-0.5 text-[9.5px]">host</span>
+              <span className="kicker frame bg-ink px-2 py-0.5 text-[9.5px] text-white">host</span>
             )}
             <span className="w-14 text-right text-lg font-black tabular-nums tracking-tight">{p.total}</span>
           </li>
