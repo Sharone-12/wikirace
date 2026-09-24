@@ -4,7 +4,12 @@
 // on the server).
 
 const API = "https://en.wikipedia.org/w/api.php";
+// Pre-rendered article HTML, served from Wikipedia's edge cache. Much faster
+// than action=parse, which renders the page from scratch on every request.
+const REST_HTML = "https://en.wikipedia.org/api/rest_v1/page/html/";
 const IS_SERVER = typeof window === "undefined";
+// Wikimedia asks server-side clients to identify themselves.
+const SERVER_HEADERS = { "User-Agent": "WikiRace/1.0 (https://github.com/Sharone-12/wikirace)" };
 
 export interface Article {
   title: string; // canonical title after redirects
@@ -22,12 +27,7 @@ export function normTitle(t: string): string {
 export async function api<T>(params: Record<string, string>): Promise<T> {
   const qs = new URLSearchParams({ format: "json", formatversion: "2", ...params });
   if (!IS_SERVER) qs.set("origin", "*");
-  const res = await fetch(`${API}?${qs}`, {
-    // Wikimedia asks server-side clients to identify themselves.
-    headers: IS_SERVER
-      ? { "User-Agent": "WikiRace/1.0 (https://github.com/Sharone-12/wikirace)" }
-      : undefined,
-  });
+  const res = await fetch(`${API}?${qs}`, { headers: IS_SERVER ? SERVER_HEADERS : undefined });
   if (!res.ok) throw new Error(`Wikipedia API error ${res.status}`);
   const json = await res.json();
   if (json.error) throw new Error(json.error.info ?? "Wikipedia API error");
@@ -80,6 +80,12 @@ export function cleanArticle(root: HTMLElement): { html: string; linkCount: numb
   // Drop trailing sections (References, External links, ...) and their content.
   root.querySelectorAll("h2").forEach((h2) => {
     if (!h2.isConnected || !CUT_SECTIONS.has(h2.id.toLowerCase())) return;
+    // REST HTML: the heading opens a <section> holding everything under it.
+    const section = h2.closest("section");
+    if (section && section.querySelector("h2") === h2) {
+      section.remove();
+      return;
+    }
     const head = h2.closest(".mw-heading") ?? h2;
     let next = head.nextElementSibling;
     while (next && !next.matches("h2, .mw-heading2, .mw-heading")) {
@@ -94,7 +100,9 @@ export function cleanArticle(root: HTMLElement): { html: string; linkCount: numb
   const links = new Set<string>();
   root.querySelectorAll("a").forEach((a) => {
     const href = a.getAttribute("href") ?? "";
-    const m = href.match(/^\/wiki\/([^#?]+)/);
+    // "./Title" in the REST HTML, "/wiki/Title" in action=parse HTML. Redlinks
+    // (class "new") point at pages that don't exist.
+    const m = a.classList.contains("new") ? null : href.match(/^(?:\.|\/wiki)\/([^#?]+)/);
     let title: string | null = null;
     if (m) {
       try {
@@ -114,6 +122,12 @@ export function cleanArticle(root: HTMLElement): { html: string; linkCount: numb
       // external, namespace, redlink, or in-page anchor: keep the text, drop the link
       a.replaceWith(...Array.from(a.childNodes));
     }
+  });
+
+  // REST HTML carries template metadata in data-mw attributes; the game never needs it.
+  root.querySelectorAll("[data-mw], [data-mw-i18n]").forEach((el) => {
+    el.removeAttribute("data-mw");
+    el.removeAttribute("data-mw-i18n");
   });
 
   return { html: root.innerHTML, linkCount, links: [...links] };
@@ -207,8 +221,28 @@ export async function fetchExtract(title: string): Promise<string> {
   return data.query.pages[0]?.extract ?? "";
 }
 
+const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'" };
+
+/**
+ * Canonical title of a REST HTML page (after any redirect), read from its
+ * head: the dc:isVersionOf link, or failing that the <title> text.
+ */
+export function restTitle(raw: string): string | null {
+  const link = raw.match(/<link rel="dc:isVersionOf" href="[^"]*\/wiki\/([^"#?]+)"/);
+  if (link) {
+    try {
+      return normTitle(decodeURIComponent(link[1]));
+    } catch {
+      // fall through to <title>
+    }
+  }
+  const t = raw.match(/<title>([^<]*)<\/title>/);
+  return t ? normTitle(t[1].replace(/&(amp|lt|gt|quot|#39);/g, (_, e: string) => ENTITIES[e])) : null;
+}
+
 export function createWiki(toBody: (rawHtml: string) => HTMLElement, cacheSize = 300) {
   const cache = new Map<string, Article>();
+  const inflight = new Map<string, Promise<Article>>(); // shared by a prefetch and the click that follows
 
   function remember(key: string, article: Article) {
     cache.delete(key);
@@ -216,24 +250,33 @@ export function createWiki(toBody: (rawHtml: string) => HTMLElement, cacheSize =
     while (cache.size > cacheSize) cache.delete(cache.keys().next().value as string);
   }
 
-  async function fetchArticle(title: string): Promise<Article> {
+  function fetchArticle(title: string): Promise<Article> {
     const key = normTitle(title);
     const hit = cache.get(key);
-    if (hit) return hit;
+    if (hit) return Promise.resolve(hit);
+    const pending = inflight.get(key);
+    if (pending) return pending;
+    const p = loadArticle(title, key).finally(() => inflight.delete(key));
+    inflight.set(key, p);
+    return p;
+  }
 
-    const data = await api<{ parse: { title: string; text: string } }>({
-      action: "parse",
-      page: title,
-      prop: "text",
-      redirects: "1",
-      disableeditsection: "1",
-      disabletoc: "1",
-      disablelimitreport: "1",
+  /** Start loading an article the player is about to click; errors are left for the click. */
+  function prefetchArticle(title: string): void {
+    fetchArticle(title).catch(() => {});
+  }
+
+  async function loadArticle(title: string, key: string): Promise<Article> {
+    const res = await fetch(REST_HTML + encodeURIComponent(title.replace(/ /g, "_")), {
+      headers: IS_SERVER ? SERVER_HEADERS : undefined,
     });
-    const { html, linkCount, links } = cleanArticle(toBody(data.parse.text));
-    const article: Article = { title: data.parse.title, html, linkCount, links };
+    if (res.status === 404) throw new Error(`No such article: ${title}`);
+    if (!res.ok) throw new Error(`Wikipedia error ${res.status}`);
+    const raw = await res.text();
+    const { html, linkCount, links } = cleanArticle(toBody(raw));
+    const article: Article = { title: restTitle(raw) ?? normTitle(title), html, linkCount, links };
     remember(key, article);
-    remember(normTitle(data.parse.title), article);
+    remember(normTitle(article.title), article);
     return article;
   }
 
@@ -283,5 +326,5 @@ export function createWiki(toBody: (rawHtml: string) => HTMLElement, cacheSize =
     getArticle: fetchArticle,
   };
 
-  return { fetchArticle, pickStart, closeDeps };
+  return { fetchArticle, prefetchArticle, pickStart, closeDeps };
 }

@@ -20,4 +20,4 @@ function toBody(rawHtml: string): HTMLElement {
   return new DOMParser().parseFromString(clean, "text/html").body;
 }
 
-export const { fetchArticle, pickStart, closeDeps } = createWiki(toBody);
+export const { fetchArticle, prefetchArticle, pickStart, closeDeps } = createWiki(toBody);

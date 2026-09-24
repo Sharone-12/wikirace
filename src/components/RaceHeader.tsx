@@ -1,7 +1,13 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Trail } from "@/components/RouteLine";
+import { prefetchArticle } from "@/lib/wiki";
+
+// Hovering a link this long starts loading it, so the click lands on a page
+// that's already on its way. Short enough to beat a deliberate click, long
+// enough that sweeping the mouse across the page doesn't fetch everything.
+const PREFETCH_HOVER_MS = 90;
 
 interface RaceHeaderProps {
   target: string;
@@ -104,6 +110,9 @@ interface ArticleViewProps {
 
 /** The rendered Wikipedia article; link clicks are routed to onLink. */
 export function ArticleView({ title, html, busy, error, onLink }: ArticleViewProps) {
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const linkTitle = (target: EventTarget) => (target as HTMLElement).closest("a")?.getAttribute("data-title");
+
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6" aria-busy={busy}>
       {error && (
@@ -119,6 +128,20 @@ export function ArticleView({ title, html, busy, error, onLink }: ArticleViewPro
           e.preventDefault();
           const linked = a.getAttribute("data-title");
           if (linked) onLink(linked);
+        }}
+        onPointerOver={(e) => {
+          const linked = linkTitle(e.target);
+          if (!linked) return;
+          if (hoverTimer.current) clearTimeout(hoverTimer.current);
+          hoverTimer.current = setTimeout(() => prefetchArticle(linked), PREFETCH_HOVER_MS);
+        }}
+        onPointerOut={() => {
+          if (hoverTimer.current) clearTimeout(hoverTimer.current);
+        }}
+        onPointerDown={(e) => {
+          // Touch has no hover: start as soon as the finger lands.
+          const linked = linkTitle(e.target);
+          if (linked) prefetchArticle(linked);
         }}
         onContextMenu={(e) => e.preventDefault()}
         className={`wiki-content transition-opacity ${busy ? "opacity-50" : ""}`}
