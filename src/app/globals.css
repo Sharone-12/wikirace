@@ -12,6 +12,7 @@
   --muted: #5c5c5c;
   --line: #0a0a0a;
   --hair: rgba(10, 10, 10, 0.18);
+  --link: #1a5fd6; /* the one colour: clickable links in articles, so they're easy to spot */
 
   --signal: var(--ink);
   --signal-ink: #ffffff;
@@ -277,18 +278,18 @@ body:has(.landing) {
   overflow-wrap: anywhere;
 }
 .wiki-content a[data-title] {
-  color: var(--ink);
+  color: var(--link);
   font-weight: 600;
   cursor: pointer;
   text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--ink) 45%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--link) 35%, transparent);
   text-decoration-thickness: 1.5px;
   text-underline-offset: 3px;
 }
 .wiki-content a[data-title]:hover {
-  background: var(--ink);
+  background: var(--link);
   color: #fff;
-  text-decoration-color: var(--ink);
+  text-decoration-color: var(--link);
 }
 .wiki-content p {
   margin: 0.7em 0;
