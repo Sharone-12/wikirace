@@ -158,6 +158,13 @@ export default function Room({ code: rawCode }: { code: string }) {
     };
   }, [code, meId, meName, refresh, onProgress, router]);
 
+  // Rematch fallback: if the "rematch" broadcast was missed, the next state
+  // we fetch names the new room, so nobody is left behind in the old one.
+  const nextCode = state?.room.nextCode;
+  useEffect(() => {
+    if (nextCode) router.push(`/room/${nextCode}`);
+  }, [nextCode, router]);
+
   // Polling fallback in case a broadcast is missed; faster while scoring.
   const roundStatus = state?.round?.status;
   useEffect(() => {

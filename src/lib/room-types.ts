@@ -35,6 +35,7 @@ export interface RoomState {
     hostId: string;
     roundsTotal: number;
     timeLimit: number; // seconds
+    nextCode: string | null; // after a rematch: the room everyone moved to
   };
   players: { id: string; name: string; total: number }[];
   round: null | {

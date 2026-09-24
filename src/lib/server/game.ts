@@ -38,6 +38,7 @@ interface RoomRow {
   status: RoomStatus;
   rounds_total: number;
   time_limit: number;
+  created_at: string;
 }
 interface RoundRow {
   id: string;
@@ -65,7 +66,7 @@ interface RunRow {
   closeness: Closeness | null;
 }
 
-const ROOM_COLS = "id, code, host_id, status, rounds_total, time_limit";
+const ROOM_COLS = "id, code, host_id, status, rounds_total, time_limit, created_at";
 const ROUND_COLS =
   "id, room_id, number, start_title, target_title, target_extract, time_limit, starts_at, status, closing_at";
 const RUN_COLS =
@@ -95,6 +96,24 @@ async function isMember(roomId: string, playerId: string): Promise<boolean> {
       .maybeSingle(),
   );
   return !!row;
+}
+
+// The room a rematch moved this room's players to: the host's next room.
+// Rematch creates it the moment a game ends, so no schema link is needed.
+// Players who missed the "rematch" broadcast (backgrounded tab, reconnect,
+// refresh) find it through here on their next poll.
+async function rematchRoom(room: RoomRow): Promise<{ id: string; code: string } | null> {
+  if (room.status !== "finished") return null;
+  return must(
+    await db()
+      .from("rooms")
+      .select("id, code")
+      .eq("host_id", room.host_id)
+      .gt("created_at", room.created_at)
+      .order("created_at")
+      .limit(1)
+      .maybeSingle(),
+  ) as { id: string; code: string } | null;
 }
 
 async function currentRound(roomId: string): Promise<RoundRow | null> {
@@ -216,6 +235,8 @@ export async function getState(player: Player, code: string): Promise<RoomState>
   }
 
   const round = roundRows.at(-1) ?? null;
+  const next = await rematchRoom(room);
+  const nextCode = next && (await isMember(next.id, player.id)) ? next.code : null;
   return {
     serverNow: Date.now(),
     me: player.id,
@@ -225,6 +246,7 @@ export async function getState(player: Player, code: string): Promise<RoomState>
       hostId: room.host_id,
       roundsTotal: room.rounds_total,
       timeLimit: room.time_limit,
+      nextCode,
     },
     players: memberRows.map((m) => ({
       id: m.player_id,
@@ -554,7 +576,23 @@ export async function tryClose(code: string): Promise<void> {
 export async function rematch(player: Player, code: string): Promise<{ code: string }> {
   const room = await loadRoom(code);
   if (room.host_id !== player.id) throw new HttpError(403, "Only the host can start a rematch.");
-  if (room.status !== "finished") throw new HttpError(409, "This game isn't over yet.");
+  if (room.status !== "finished") {
+    // Closing the last round marks the room finished in a separate write; if
+    // that write was lost, the game is still over, so repair it here.
+    const last = await currentRound(room.id);
+    if (last?.status !== "closed" || last.number < room.rounds_total) {
+      throw new HttpError(409, "This game isn't over yet.");
+    }
+    must(await db().from("rooms").update({ status: "finished" }).eq("id", room.id));
+    room.status = "finished";
+  }
+  // A second press (double click, second tab) returns the same new room
+  // instead of splitting the players across two.
+  const existing = await rematchRoom(room);
+  if (existing) {
+    after(() => broadcast(room.code, { event: "rematch", payload: { code: existing.code } }));
+    return { code: existing.code };
+  }
   const members = must(
     await db().from("room_players").select("player_id").eq("room_id", room.id),
   ) as { player_id: string }[];
