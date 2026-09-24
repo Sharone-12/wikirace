@@ -5,7 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { TopBar } from "@/components/Brand";
 import { ArticleView, RaceHeader } from "@/components/RaceHeader";
 import { RouteMap, RouteTicker } from "@/components/RouteLine";
-import { pickTarget } from "@/lib/targets";
+import { rememberRound, recentTitles } from "@/lib/client/recent";
+import { pickRoute } from "@/lib/targets";
 import {
   describeCloseness,
   measureCloseness,
@@ -20,7 +21,8 @@ import {
   fetchArticle,
   fetchExtract,
   normTitle,
-  pickStart,
+  pickCuratedStart,
+  prefetchArticle,
   type Article,
 } from "@/lib/wiki";
 
@@ -50,6 +52,9 @@ export default function Game() {
   const [startCloseness, setStartCloseness] = useState<Closeness | null>(null);
 
   const nameRef = useRef<HTMLInputElement>(null);
+  // The next round's route, picked early so its start page downloads while
+  // the player is still on the landing or results screen.
+  const nextRoute = useRef<ReturnType<typeof pickRoute> | null>(null);
   const startedAt = useRef(0);
   const targetCanon = useRef("");
   // Start closeness, measured in the background while the round is played.
@@ -66,10 +71,17 @@ export default function Game() {
     setError(null);
     setPhase("loading");
     try {
-      const t = pickTarget();
-      const canon = await canonicalTitle(t);
+      const route = nextRoute.current ?? pickRoute(recentTitles());
+      nextRoute.current = null;
+      // Pool titles are canonical already; the lookup is a safety net, so
+      // everything runs side by side.
+      const [canon, start, extract] = await Promise.all([
+        canonicalTitle(route.target),
+        pickCuratedStart(route.starts, route.target),
+        fetchExtract(route.target),
+      ]);
       targetCanon.current = canon;
-      const [start, extract] = await Promise.all([pickStart(canon), fetchExtract(canon)]);
+      rememberRound(start.title, canon);
       setTarget(canon);
       setTargetExtract(extract);
       setArticle(start);
@@ -116,6 +128,15 @@ export default function Game() {
     if (stack.length < 2) return;
     goTo(stack[stack.length - 2], true);
   }
+
+  // On the landing and results screens, line up the next round and start
+  // downloading its likely start pages (the first batch pickCuratedStart tries).
+  useEffect(() => {
+    if (phase !== "name" && phase !== "done") return;
+    const route = pickRoute(recentTitles());
+    nextRoute.current = route;
+    route.starts.slice(0, 3).forEach(prefetchArticle);
+  }, [phase]);
 
   // Countdown, driven by wall clock so it can't drift.
   useEffect(() => {

@@ -4,7 +4,7 @@ import { db, HttpError, must } from "@/lib/server/db";
 import type { Player } from "@/lib/server/players";
 import { broadcast } from "@/lib/server/realtime";
 import { serverWiki } from "@/lib/server/wiki";
-import { TARGET_POOL } from "@/lib/targets";
+import { pickRoute } from "@/lib/targets";
 import { apiHasLink, canonicalTitle, fetchExtract, normTitle } from "@/lib/wiki-core";
 import {
   measureCloseness,
@@ -25,6 +25,7 @@ import type {
 // All game rules live here and run on the server. Timing uses the server
 // clock only; clients never report times, click counts, or scores.
 
+const RECENT_ROUNDS = 60; // a new round avoids titles from this many latest rounds, all rooms
 const COUNTDOWN_MS = 8000; // between "start" and the first allowed click
 const GRACE_MS = 1500; // network slack after the time limit
 const CLOSING_STALE_MS = 90_000; // a crashed close can be retried after this
@@ -257,19 +258,28 @@ export async function startRound(player: Player, code: string): Promise<void> {
   const number = (cur?.number ?? 0) + 1;
   if (number > room.rounds_total) throw new HttpError(409, "All rounds have been played.");
 
-  const used = new Set(
-    (
-      must(
-        await db().from("rounds").select("target_title").eq("room_id", room.id),
-      ) as { target_title: string }[]
-    ).map((r) => normTitle(r.target_title)),
-  );
-  const fresh = TARGET_POOL.filter((t) => !used.has(normTitle(t)));
-  const pool = fresh.length ? fresh : TARGET_POOL;
-  const target = await canonicalTitle(pool[Math.floor(Math.random() * pool.length)]);
-  const [start, extract] = await Promise.all([
-    serverWiki.pickStart(target),
-    fetchExtract(target).catch(() => ""),
+  // Avoid anything this room has played, plus whatever was played most
+  // recently across all rooms, so regulars don't keep meeting the same races.
+  const [roomRounds, recentRounds] = await Promise.all([
+    db().from("rounds").select("start_title, target_title").eq("room_id", room.id),
+    db()
+      .from("rounds")
+      .select("start_title, target_title")
+      .order("starts_at", { ascending: false })
+      .limit(RECENT_ROUNDS),
+  ]);
+  const played = [
+    ...(must(roomRounds) as { start_title: string; target_title: string }[]),
+    ...(must(recentRounds) as { start_title: string; target_title: string }[]),
+  ].flatMap((r) => [r.start_title, r.target_title]);
+
+  const route = pickRoute(played);
+  // Pool titles are canonical already; the lookup is a safety net, so
+  // everything runs side by side.
+  const [target, start, extract] = await Promise.all([
+    canonicalTitle(route.target),
+    serverWiki.pickCuratedStart(route.starts, route.target),
+    fetchExtract(route.target).catch(() => ""),
   ]);
 
   const members = must(

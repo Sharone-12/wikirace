@@ -364,6 +364,34 @@ export function createWiki(toBody: (rawHtml: string) => HTMLElement, cacheSize =
     throw new Error("Couldn't find a good starting article. Try again.");
   }
 
+  // A curated start that makes a real race: it loads, has plenty of links,
+  // and doesn't link straight to the target (a one-click round is no race).
+  // Candidates load a few at a time and the first good one to arrive wins
+  // (they're in random order anyway). Falls back to a random article if every
+  // candidate tried fails.
+  async function pickCuratedStart(candidates: string[], target: string, tries = 9): Promise<Article> {
+    const aliases = fetchAliases(target).catch(() => [] as string[]);
+    const BATCH = 3;
+    for (let i = 0; i < Math.min(tries, candidates.length); i += BATCH) {
+      const goal = aliases.then((a) => new Set([normTitle(target), ...a]));
+      const batch = candidates.slice(i, i + BATCH).map(async (title) => {
+        const [article, reject] = await Promise.all([fetchArticle(title), goal]);
+        const bad =
+          reject.has(normTitle(article.title)) ||
+          article.linkCount < 25 ||
+          article.links.some((l) => reject.has(l));
+        if (bad) throw new Error(`Not a good start: ${title}`);
+        return article;
+      });
+      try {
+        return await Promise.any(batch);
+      } catch {
+        // every candidate in this batch failed or was unsuitable: next batch
+      }
+    }
+    return pickStart(target);
+  }
+
   // Closeness dependencies (see scoring.ts) backed by this wiki instance.
   const closeDeps = {
     aliases: fetchAliases,
@@ -371,5 +399,5 @@ export function createWiki(toBody: (rawHtml: string) => HTMLElement, cacheSize =
     getArticle: fetchArticle,
   };
 
-  return { fetchArticle, prefetchArticle, prefetchLinks, pickStart, closeDeps };
+  return { fetchArticle, prefetchArticle, prefetchLinks, pickStart, pickCuratedStart, closeDeps };
 }
