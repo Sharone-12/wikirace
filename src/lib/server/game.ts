@@ -25,7 +25,7 @@ import type {
 // All game rules live here and run on the server. Timing uses the server
 // clock only; clients never report times, click counts, or scores.
 
-const COUNTDOWN_MS = 5000; // between "start" and the first allowed click
+const COUNTDOWN_MS = 8000; // between "start" and the first allowed click
 const GRACE_MS = 1500; // network slack after the time limit
 const CLOSING_STALE_MS = 90_000; // a crashed close can be retried after this
 const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O
@@ -307,6 +307,14 @@ export async function startRound(player: Player, code: string): Promise<void> {
   if (room.status === "lobby") {
     must(await db().from("rooms").update({ status: "playing" }).eq("id", room.id));
   }
+  // The writes above can take seconds; restart the countdown now so players
+  // still get all of it. Nobody can move yet, since starts_at is in the future.
+  must(
+    await db()
+      .from("rounds")
+      .update({ starts_at: new Date(Date.now() + COUNTDOWN_MS).toISOString() })
+      .eq("id", round.id),
+  );
   after(() => broadcast(room.code, { event: "refresh", payload: {} }));
 }
 

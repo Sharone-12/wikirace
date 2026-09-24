@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LineDemo, RouteMap, Trail } from "@/components/RouteLine";
+import { ArticleView, RaceHeader } from "@/components/RaceHeader";
+import { LineDemo, RouteMap } from "@/components/RouteLine";
 import { pickTarget } from "@/lib/targets";
 import {
   describeCloseness,
@@ -33,7 +35,6 @@ export default function Game() {
 
   const [target, setTarget] = useState("");
   const [targetExtract, setTargetExtract] = useState("");
-  const [showExtract, setShowExtract] = useState(false);
   const [article, setArticle] = useState<Article | null>(null);
   const [stack, setStack] = useState<string[]>([]); // for the in-app Back button
   const [path, setPath] = useState<string[]>([]); // every article visited, in order
@@ -69,7 +70,6 @@ export default function Game() {
       const [start, extract] = await Promise.all([pickStart(canon), fetchExtract(canon)]);
       setTarget(canon);
       setTargetExtract(extract);
-      setShowExtract(false);
       setArticle(start);
       setStack([start.title]);
       setPath([start.title]);
@@ -109,14 +109,6 @@ export default function Game() {
     },
     [navigating, phase, finish],
   );
-
-  function onContentClick(e: React.MouseEvent) {
-    const a = (e.target as HTMLElement).closest("a");
-    if (!a) return;
-    e.preventDefault();
-    const title = a.getAttribute("data-title");
-    if (title) goTo(title, false);
-  }
 
   function goBack() {
     if (stack.length < 2) return;
@@ -228,6 +220,9 @@ export default function Game() {
         <p className="mt-8 text-sm text-muted">
           Going back costs a click. Fewer clicks and more time left score higher.
         </p>
+        <Link href="/play" className="mt-4 self-start text-sm font-semibold text-signal underline">
+          Play with friends
+        </Link>
       </main>
     );
   }
@@ -309,94 +304,27 @@ export default function Game() {
     );
   }
 
-  const mm = Math.floor(timeLeft / 60);
-  const ss = String(timeLeft % 60).padStart(2, "0");
-  const low = timeLeft <= 30;
-
   return (
     <div className="flex flex-1 flex-col">
-      <header className="sticky top-0 z-10 border-b border-line bg-bg/95 backdrop-blur">
-        <div
-          className="h-1 bg-line"
-          role="progressbar"
-          aria-label="Time left"
-          aria-valuemin={0}
-          aria-valuemax={TIME_LIMIT}
-          aria-valuenow={timeLeft}
-        >
-          <div
-            className={`h-full transition-[width] duration-300 ease-linear ${low ? "bg-stop" : "bg-signal"}`}
-            style={{ width: `${(timeLeft / TIME_LIMIT) * 100}%` }}
-          />
-        </div>
-
-        <div className="mx-auto max-w-4xl px-4 py-2.5">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setShowExtract((v) => !v)}
-              aria-expanded={showExtract}
-              className="min-w-0 flex-1 rounded-xl bg-sun px-3.5 py-2 text-left text-sun-ink"
-              title="Tap to see what the target is"
-            >
-              <div className="text-xs font-medium opacity-70">Get to</div>
-              <div className="truncate text-lg font-bold leading-tight">{target}</div>
-            </button>
-            <div className="text-right">
-              <div className="text-3xl font-extrabold leading-none tabular-nums">{clicks}</div>
-              <div className="mt-0.5 text-xs text-muted">{clicks === 1 ? "click" : "clicks"}</div>
-            </div>
-            <div className="text-right">
-              <div
-                className={`text-3xl font-extrabold leading-none tabular-nums ${low ? "text-stop" : ""}`}
-              >
-                {mm}:{ss}
-              </div>
-              <div className="mt-0.5 text-xs text-muted">left</div>
-            </div>
-          </div>
-
-          {showExtract && targetExtract && (
-            <p className="mt-2 rounded-lg bg-surface px-3 py-2 text-sm text-muted ring-1 ring-line">
-              {targetExtract}
-            </p>
-          )}
-
-          <div className="mt-2.5 flex items-center gap-3">
-            <button
-              onClick={goBack}
-              disabled={stack.length < 2 || navigating}
-              className="shrink-0 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium disabled:opacity-40"
-              title="Going back costs a click"
-            >
-              Back (+1 click)
-            </button>
-            <Trail path={path} target={target} />
-            <button
-              onClick={() => finish("gave-up")}
-              className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-stop ring-1 ring-stop/40"
-            >
-              Give up
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6" aria-busy={navigating}>
-        {error && (
-          <p role="alert" className="mb-4 rounded-lg bg-stop/10 px-3 py-2 text-sm text-stop">
-            {error}
-          </p>
-        )}
-        <h1 className="mb-5 text-4xl font-extrabold leading-tight tracking-tight">
-          {article?.title}
-        </h1>
-        <div
-          onClick={onContentClick}
-          onContextMenu={(e) => e.preventDefault()}
-          className={`wiki-content transition-opacity ${navigating ? "opacity-50" : ""}`}
-          dangerouslySetInnerHTML={{ __html: article?.html ?? "" }}
-        />
-      </main>
+      <RaceHeader
+        target={target}
+        targetExtract={targetExtract}
+        clicks={clicks}
+        timeLeft={timeLeft}
+        timeLimit={TIME_LIMIT}
+        path={path}
+        canGoBack={stack.length > 1}
+        busy={navigating}
+        onBack={goBack}
+        onGiveUp={() => finish("gave-up")}
+      />
+      <ArticleView
+        title={article?.title ?? ""}
+        html={article?.html ?? ""}
+        busy={navigating}
+        error={error}
+        onLink={(title) => goTo(title, false)}
+      />
     </div>
   );
 }
