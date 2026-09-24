@@ -1,4 +1,6 @@
-import { fetchAliases, fetchArticle, normTitle, pagesLinkingTo, type Article } from "@/lib/wiki";
+// Pure scoring logic, shared by the browser (solo mode) and the server
+// (multiplayer). Network access comes in through CloseDeps.
+import { normTitle, type Article } from "@/lib/wiki-core";
 
 // How close a player got, measured from the last article they were on.
 //   1 = that article links straight to the target (one click away)
@@ -25,12 +27,6 @@ export interface CloseDeps {
   getArticle(title: string): Promise<LinkedArticle>;
 }
 
-const defaultDeps: CloseDeps = {
-  aliases: fetchAliases,
-  linkersOf: pagesLinkingTo,
-  getArticle: fetchArticle,
-};
-
 export const MAX_ROUTES = 10; // more routes than this earns nothing extra
 export const MAX_VERIFY = 20; // rendered pages fetched to confirm candidates
 const VERIFY_PARALLEL = 4;
@@ -38,7 +34,7 @@ const VERIFY_PARALLEL = 4;
 export async function measureCloseness(
   article: LinkedArticle,
   target: string,
-  deps: CloseDeps = defaultDeps,
+  deps: CloseDeps,
 ): Promise<Closeness> {
   // Aliases are a refinement, so a failed lookup degrades instead of failing.
   const aliases = await deps.aliases(target).catch(() => [] as string[]);

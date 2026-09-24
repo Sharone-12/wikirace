@@ -1,0 +1,559 @@
+import "server-only";
+import { after } from "next/server";
+import { db, HttpError, must } from "@/lib/server/db";
+import type { Player } from "@/lib/server/players";
+import { broadcast } from "@/lib/server/realtime";
+import { serverWiki } from "@/lib/server/wiki";
+import { TARGET_POOL } from "@/lib/targets";
+import { apiHasLink, canonicalTitle, fetchExtract, normTitle } from "@/lib/wiki-core";
+import {
+  measureCloseness,
+  scoreDnf,
+  scoreFinish,
+  type Closeness,
+  type ScoreBreakdown,
+} from "@/lib/scoring";
+import type {
+  PathStep,
+  RoomState,
+  RoomStatus,
+  RoundStatus,
+  RunStatus,
+  RunView,
+} from "@/lib/room-types";
+
+// All game rules live here and run on the server. Timing uses the server
+// clock only; clients never report times, click counts, or scores.
+
+const COUNTDOWN_MS = 5000; // between "start" and the first allowed click
+const GRACE_MS = 1500; // network slack after the time limit
+const CLOSING_STALE_MS = 90_000; // a crashed close can be retried after this
+const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O
+
+interface RoomRow {
+  id: string;
+  code: string;
+  host_id: string;
+  status: RoomStatus;
+  rounds_total: number;
+  time_limit: number;
+}
+interface RoundRow {
+  id: string;
+  room_id: string;
+  number: number;
+  start_title: string;
+  target_title: string;
+  target_extract: string;
+  time_limit: number;
+  starts_at: string;
+  status: RoundStatus;
+  closing_at: string | null;
+}
+interface RunRow {
+  id: string;
+  round_id: string;
+  player_id: string;
+  stack: string[];
+  path: PathStep[];
+  clicks: number;
+  status: RunStatus;
+  elapsed_ms: number | null;
+  score: number | null;
+  score_parts: ScoreBreakdown["parts"] | null;
+  closeness: Closeness | null;
+}
+
+const ROOM_COLS = "id, code, host_id, status, rounds_total, time_limit";
+const ROUND_COLS =
+  "id, room_id, number, start_title, target_title, target_extract, time_limit, starts_at, status, closing_at";
+const RUN_COLS =
+  "id, round_id, player_id, stack, path, clicks, status, elapsed_ms, score, score_parts, closeness";
+
+function normCode(code: string): string {
+  const c = code.toUpperCase();
+  if (!/^[A-Z]{4}$/.test(c)) throw new HttpError(404, "That room code doesn't exist.");
+  return c;
+}
+
+async function loadRoom(code: string): Promise<RoomRow> {
+  const room = must(
+    await db().from("rooms").select(ROOM_COLS).eq("code", normCode(code)).maybeSingle(),
+  ) as RoomRow | null;
+  if (!room) throw new HttpError(404, "That room code doesn't exist.");
+  return room;
+}
+
+async function isMember(roomId: string, playerId: string): Promise<boolean> {
+  const row = must(
+    await db()
+      .from("room_players")
+      .select("player_id")
+      .eq("room_id", roomId)
+      .eq("player_id", playerId)
+      .maybeSingle(),
+  );
+  return !!row;
+}
+
+async function currentRound(roomId: string): Promise<RoundRow | null> {
+  return must(
+    await db()
+      .from("rounds")
+      .select(ROUND_COLS)
+      .eq("room_id", roomId)
+      .order("number", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ) as RoundRow | null;
+}
+
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
+// ---------------------------------------------------------------- rooms
+
+export async function createRoom(
+  player: Player,
+  opts: { roundsTotal?: unknown; timeLimit?: unknown },
+): Promise<{ code: string }> {
+  const roundsTotal = Math.min(10, Math.max(1, Math.round(Number(opts.roundsTotal) || 5)));
+  const timeLimit = Math.min(600, Math.max(60, Math.round(Number(opts.timeLimit) || 180)));
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const code = Array.from(
+      { length: 4 },
+      () => CODE_LETTERS[Math.floor(Math.random() * CODE_LETTERS.length)],
+    ).join("");
+    const res = await db()
+      .from("rooms")
+      .insert({ code, host_id: player.id, rounds_total: roundsTotal, time_limit: timeLimit })
+      .select("id")
+      .single();
+    if (res.error?.code === "23505") continue; // code taken, try another
+    const room = must(res) as { id: string };
+    must(await db().from("room_players").insert({ room_id: room.id, player_id: player.id }));
+    return { code };
+  }
+  throw new Error("Couldn't find a free room code");
+}
+
+export async function joinRoom(player: Player, code: string): Promise<void> {
+  const room = await loadRoom(code);
+  if (!(await isMember(room.id, player.id))) {
+    const res = await db().from("room_players").insert({ room_id: room.id, player_id: player.id });
+    if (res.error && res.error.code !== "23505") must(res);
+  }
+  // Also covers a rejoin with a changed name.
+  after(() => broadcast(room.code, { event: "refresh", payload: {} }));
+}
+
+// ---------------------------------------------------------------- state
+
+function toRunView(run: RunRow, round: RoundRow, meId: string): RunView {
+  const mine = run.player_id === meId;
+  const visible = mine || round.status === "closed";
+  const showScore = round.status === "closed" || (mine && run.status === "finished");
+  return {
+    playerId: run.player_id,
+    clicks: run.clicks,
+    status: run.status,
+    elapsedMs: run.elapsed_ms,
+    score: showScore ? run.score : null,
+    scoreParts: showScore ? run.score_parts : null,
+    closeness: round.status === "closed" ? run.closeness : null,
+    current: visible ? (run.stack.at(-1) ?? null) : null,
+    path: visible ? run.path : null,
+    canGoBack: mine && run.status === "playing" && run.stack.length > 1,
+  };
+}
+
+export async function getState(player: Player, code: string): Promise<RoomState> {
+  const room = await loadRoom(code);
+  if (!(await isMember(room.id, player.id))) throw new HttpError(403, "Join the room first.");
+
+  const [members, rounds] = await Promise.all([
+    db()
+      .from("room_players")
+      .select("player_id, joined_at, players(name)")
+      .eq("room_id", room.id)
+      .order("joined_at"),
+    db().from("rounds").select(ROUND_COLS).eq("room_id", room.id).order("number"),
+  ]);
+  const memberRows = must(members) as unknown as {
+    player_id: string;
+    players: { name: string } | null;
+  }[];
+  const roundRows = must(rounds) as RoundRow[];
+  const runRows = roundRows.length
+    ? (must(
+        await db()
+          .from("runs")
+          .select(RUN_COLS)
+          .in(
+            "round_id",
+            roundRows.map((r) => r.id),
+          ),
+      ) as RunRow[])
+    : [];
+
+  const closedRounds = new Set(roundRows.filter((r) => r.status === "closed").map((r) => r.id));
+  const totals = new Map<string, number>();
+  for (const r of runRows) {
+    if (closedRounds.has(r.round_id)) {
+      totals.set(r.player_id, (totals.get(r.player_id) ?? 0) + (r.score ?? 0));
+    }
+  }
+
+  const round = roundRows.at(-1) ?? null;
+  return {
+    serverNow: Date.now(),
+    me: player.id,
+    room: {
+      code: room.code,
+      status: room.status,
+      hostId: room.host_id,
+      roundsTotal: room.rounds_total,
+      timeLimit: room.time_limit,
+    },
+    players: memberRows.map((m) => ({
+      id: m.player_id,
+      name: m.players?.name ?? "Player",
+      total: totals.get(m.player_id) ?? 0,
+    })),
+    round: round && {
+      id: round.id,
+      number: round.number,
+      start: round.start_title,
+      target: round.target_title,
+      targetExtract: round.target_extract,
+      timeLimit: round.time_limit,
+      startsAt: Date.parse(round.starts_at),
+      status: round.status,
+    },
+    runs: round
+      ? runRows.filter((r) => r.round_id === round.id).map((r) => toRunView(r, round, player.id))
+      : [],
+  };
+}
+
+// ---------------------------------------------------------------- rounds
+
+export async function startRound(player: Player, code: string): Promise<void> {
+  const room = await loadRoom(code);
+  if (room.host_id !== player.id) throw new HttpError(403, "Only the host can start a round.");
+  if (room.status === "finished") throw new HttpError(409, "This game is over.");
+  const cur = await currentRound(room.id);
+  if (cur && cur.status !== "closed") throw new HttpError(409, "A round is already running.");
+  const number = (cur?.number ?? 0) + 1;
+  if (number > room.rounds_total) throw new HttpError(409, "All rounds have been played.");
+
+  const used = new Set(
+    (
+      must(
+        await db().from("rounds").select("target_title").eq("room_id", room.id),
+      ) as { target_title: string }[]
+    ).map((r) => normTitle(r.target_title)),
+  );
+  const fresh = TARGET_POOL.filter((t) => !used.has(normTitle(t)));
+  const pool = fresh.length ? fresh : TARGET_POOL;
+  const target = await canonicalTitle(pool[Math.floor(Math.random() * pool.length)]);
+  const [start, extract] = await Promise.all([
+    serverWiki.pickStart(target),
+    fetchExtract(target).catch(() => ""),
+  ]);
+
+  const members = must(
+    await db().from("room_players").select("player_id").eq("room_id", room.id),
+  ) as { player_id: string }[];
+
+  const res = await db()
+    .from("rounds")
+    .insert({
+      room_id: room.id,
+      number,
+      start_title: start.title,
+      target_title: target,
+      target_extract: extract,
+      time_limit: room.time_limit,
+      starts_at: new Date(Date.now() + COUNTDOWN_MS).toISOString(),
+    })
+    .select("id")
+    .single();
+  if (res.error?.code === "23505") throw new HttpError(409, "A round is already running.");
+  const round = must(res) as { id: string };
+
+  must(
+    await db()
+      .from("runs")
+      .insert(
+        members.map((m) => ({
+          round_id: round.id,
+          player_id: m.player_id,
+          stack: [start.title],
+          path: [{ title: start.title, t: 0 }],
+        })),
+      ),
+  );
+  if (room.status === "lobby") {
+    must(await db().from("rooms").update({ status: "playing" }).eq("id", room.id));
+  }
+  after(() => broadcast(room.code, { event: "refresh", payload: {} }));
+}
+
+async function loadMyRun(player: Player, code: string) {
+  const room = await loadRoom(code);
+  const round = await currentRound(room.id);
+  if (!round || round.status !== "playing") throw new HttpError(409, "This round is over.");
+  const run = must(
+    await db()
+      .from("runs")
+      .select(RUN_COLS)
+      .eq("round_id", round.id)
+      .eq("player_id", player.id)
+      .maybeSingle(),
+  ) as RunRow | null;
+  if (!run) throw new HttpError(403, "You're watching this round. You'll play the next one.");
+  if (run.status !== "playing") throw new HttpError(409, "Your run is already over.");
+  return { room, round, run, startsAt: Date.parse(round.starts_at) };
+}
+
+function checkClock(round: RoundRow, startsAt: number, code: string, now = Date.now()) {
+  if (now < startsAt) throw new HttpError(409, "The round hasn't started yet.");
+  if (now > startsAt + round.time_limit * 1000 + GRACE_MS) {
+    after(() => tryClose(code));
+    throw new HttpError(409, "Time's up.");
+  }
+}
+
+export async function move(
+  player: Player,
+  code: string,
+  body: { from?: unknown; via?: unknown; back?: unknown },
+): Promise<RunView> {
+  const { room, round, run, startsAt } = await loadMyRun(player, code);
+  checkClock(round, startsAt, room.code);
+
+  const top = run.stack.at(-1) ?? round.start_title;
+  if (typeof body.from !== "string" || normTitle(body.from) !== normTitle(top)) {
+    throw new HttpError(409, "Out of sync with the server.");
+  }
+
+  let stack: string[];
+  let step: Omit<PathStep, "t">;
+  if (body.back === true) {
+    if (run.stack.length < 2) throw new HttpError(400, "There's nowhere to go back to.");
+    stack = run.stack.slice(0, -1);
+    step = { title: stack.at(-1)!, back: true };
+  } else {
+    const via = typeof body.via === "string" ? body.via.trim() : "";
+    if (!via || via.length > 300 || via.includes("|")) throw new HttpError(400, "Bad link.");
+    // Wikipedia's link table first; fall back to the rendered page, which is
+    // what the player actually saw.
+    const linked =
+      (await apiHasLink(top, via).catch(() => false)) ||
+      (await serverWiki.fetchArticle(top)).links.includes(normTitle(via));
+    if (!linked) throw new HttpError(400, "That link isn't on this page.");
+    let title: string;
+    try {
+      title = await canonicalTitle(via);
+    } catch {
+      throw new HttpError(400, "That article doesn't exist.");
+    }
+    stack = [...run.stack, title];
+    step = { title, via };
+  }
+
+  const now = Date.now();
+  checkClock(round, startsAt, room.code, now);
+  const t = now - startsAt;
+  const clicks = run.clicks + 1; // going back counts as a click too
+  const finished = normTitle(step.title) === normTitle(round.target_title);
+
+  const patch: Record<string, unknown> = {
+    stack,
+    path: [...run.path, { ...step, t }],
+    clicks,
+  };
+  if (finished) {
+    const score = scoreFinish(clicks, round.time_limit - t / 1000);
+    Object.assign(patch, {
+      status: "finished",
+      ended_at: new Date(now).toISOString(),
+      elapsed_ms: t,
+      score: score.total,
+      score_parts: score.parts,
+    });
+  }
+
+  // Optimistic concurrency: only apply if nothing changed since we read it.
+  const updated = must(
+    await db()
+      .from("runs")
+      .update(patch)
+      .eq("id", run.id)
+      .eq("clicks", run.clicks)
+      .eq("status", "playing")
+      .select(RUN_COLS)
+      .maybeSingle(),
+  ) as RunRow | null;
+  if (!updated) throw new HttpError(409, "Out of sync with the server.");
+
+  after(async () => {
+    await broadcast(room.code, {
+      event: "progress",
+      payload: { playerId: player.id, clicks: updated.clicks, status: updated.status },
+    });
+    if (finished) await tryClose(room.code);
+  });
+  return toRunView(updated, round, player.id);
+}
+
+export async function giveUp(player: Player, code: string): Promise<RunView> {
+  const { room, round, run, startsAt } = await loadMyRun(player, code);
+  const now = Date.now();
+  const updated = must(
+    await db()
+      .from("runs")
+      .update({
+        status: "gave_up",
+        ended_at: new Date(now).toISOString(),
+        elapsed_ms: Math.max(0, now - startsAt),
+      })
+      .eq("id", run.id)
+      .eq("status", "playing")
+      .select(RUN_COLS)
+      .maybeSingle(),
+  ) as RunRow | null;
+  if (!updated) throw new HttpError(409, "Your run is already over.");
+  after(async () => {
+    await broadcast(room.code, {
+      event: "progress",
+      payload: { playerId: player.id, clicks: updated.clicks, status: updated.status },
+    });
+    await tryClose(room.code);
+  });
+  return toRunView(updated, round, player.id);
+}
+
+// Close the current round if time is up or everyone is done. Safe to call
+// any number of times from any client: only one caller wins the claim.
+export async function tryClose(code: string): Promise<void> {
+  const room = await loadRoom(code);
+  const round = await currentRound(room.id);
+  if (!round || round.status === "closed") return;
+
+  const now = Date.now();
+  const startsAt = Date.parse(round.starts_at);
+  const endsAt = startsAt + round.time_limit * 1000;
+  if (round.status === "closing" && now - Date.parse(round.closing_at ?? "") < CLOSING_STALE_MS) {
+    return; // someone else is closing it
+  }
+  let runs = must(
+    await db().from("runs").select(RUN_COLS).eq("round_id", round.id),
+  ) as RunRow[];
+  const allDone = runs.every((r) => r.status !== "playing");
+  if (now < endsAt + GRACE_MS && !allDone) return;
+
+  const staleIso = new Date(now - CLOSING_STALE_MS).toISOString();
+  const claimed = must(
+    await db()
+      .from("rounds")
+      .update({ status: "closing", closing_at: new Date(now).toISOString() })
+      .eq("id", round.id)
+      .or(`status.eq.playing,and(status.eq.closing,closing_at.lt."${staleIso}")`)
+      .select("id")
+      .maybeSingle(),
+  );
+  if (!claimed) return;
+  await broadcast(room.code, { event: "refresh", payload: {} });
+
+  // Anyone still playing ran out of time where they stood.
+  must(
+    await db()
+      .from("runs")
+      .update({ status: "timed_out", ended_at: new Date(endsAt).toISOString() })
+      .eq("round_id", round.id)
+      .eq("status", "playing"),
+  );
+  runs = must(await db().from("runs").select(RUN_COLS).eq("round_id", round.id)) as RunRow[];
+
+  // Score DNFs by progress: closeness where they stopped vs. the shared start.
+  const dnfs = runs.filter((r) => r.status === "gave_up" || r.status === "timed_out");
+  if (dnfs.length) {
+    const target = round.target_title;
+    const measure = async (title: string): Promise<Closeness | null> => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const article = await serverWiki.fetchArticle(title);
+          return await measureCloseness(article, target, serverWiki.closeDeps);
+        } catch {
+          // retry once, then give up on this title
+        }
+      }
+      return null;
+    };
+    const endTitles = [...new Set(dnfs.map((r) => r.stack.at(-1) ?? round.start_title))];
+    const [startC, ...ends] = await mapLimit([round.start_title, ...endTitles], 3, measure);
+    const byTitle = new Map(endTitles.map((t, i) => [t, ends[i]]));
+
+    await Promise.all(
+      dnfs.map(async (r) => {
+        const endC = byTitle.get(r.stack.at(-1) ?? round.start_title) ?? null;
+        const score: ScoreBreakdown = endC
+          ? scoreDnf(endC, startC)
+          : { total: 0, parts: [{ label: "Couldn't measure how close you got", points: 0 }] };
+        must(
+          await db()
+            .from("runs")
+            .update({ score: score.total, score_parts: score.parts, closeness: endC })
+            .eq("id", r.id),
+        );
+      }),
+    );
+  }
+
+  must(
+    await db()
+      .from("rounds")
+      .update({ status: "closed", closed_at: new Date().toISOString() })
+      .eq("id", round.id),
+  );
+  if (round.number >= room.rounds_total) {
+    must(await db().from("rooms").update({ status: "finished" }).eq("id", room.id));
+  }
+  await broadcast(room.code, { event: "refresh", payload: {} });
+}
+
+export async function rematch(player: Player, code: string): Promise<{ code: string }> {
+  const room = await loadRoom(code);
+  if (room.host_id !== player.id) throw new HttpError(403, "Only the host can start a rematch.");
+  if (room.status !== "finished") throw new HttpError(409, "This game isn't over yet.");
+  const members = must(
+    await db().from("room_players").select("player_id").eq("room_id", room.id),
+  ) as { player_id: string }[];
+  const next = await createRoom(player, {
+    roundsTotal: room.rounds_total,
+    timeLimit: room.time_limit,
+  });
+  const nextRoom = await loadRoom(next.code);
+  const others = members.filter((m) => m.player_id !== player.id);
+  if (others.length) {
+    must(
+      await db()
+        .from("room_players")
+        .insert(others.map((m) => ({ room_id: nextRoom.id, player_id: m.player_id }))),
+    );
+  }
+  after(() => broadcast(room.code, { event: "rematch", payload: { code: next.code } }));
+  return next;
+}

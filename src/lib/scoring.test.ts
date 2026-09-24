@@ -11,7 +11,7 @@ import {
   type CloseDeps,
   type Closeness,
 } from "@/lib/scoring";
-import { normTitle } from "@/lib/wiki";
+import { normTitle } from "@/lib/wiki-core";
 
 const TARGET = "United States";
 

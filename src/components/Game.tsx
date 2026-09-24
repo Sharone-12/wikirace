@@ -13,6 +13,7 @@ import {
 } from "@/lib/scoring";
 import {
   canonicalTitle,
+  closeDeps,
   fetchArticle,
   fetchExtract,
   normTitle,
@@ -79,7 +80,7 @@ export default function Game() {
       setCloseness(null);
       setClosenessFailed(false);
       setStartCloseness(null);
-      startMeasure.current = measureCloseness(start, canon).catch(() => null);
+      startMeasure.current = measureCloseness(start, canon, closeDeps).catch(() => null);
       startedAt.current = Date.now();
       setPhase("playing");
     } catch (e) {
@@ -165,7 +166,7 @@ export default function Game() {
     const endP =
       normTitle(article.title) === normTitle(path[0] ?? "")
         ? startP.then((c) => c ?? Promise.reject(new Error("unmeasured")))
-        : measureCloseness(article, target);
+        : measureCloseness(article, target, closeDeps);
     Promise.all([endP, startP])
       .then(([end, start]) => {
         if (cancelled) return;
