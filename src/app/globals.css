@@ -271,6 +271,25 @@ body:has(.landing) {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* Chat input: focus shows only as a thin outline, no glow. */
+.chat-input,
+.chat-input:focus,
+.chat-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.chat-range {
+  accent-color: var(--ink);
+}
+@keyframes chat-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.chat-popup {
+  animation: chat-pop 0.18s ease-out;
+}
 
 /* Time bar when it's nearly out: hatched instead of solid, since there's no red. */
 .bar-low {
@@ -818,13 +837,13 @@ html[data-theme="code"] {
 }
 
 /* Room chat */
-[data-theme="code"] .chat-box.frame {
+[data-theme="code"] :is(.chat-box.frame, .chat-popup) {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
 }
 [data-theme="code"] .chat-input {
   border-color: transparent;
   background: rgba(255, 255, 255, 0.07);
   &:focus {
-    border-color: var(--link);
+    border-color: rgba(255, 255, 255, 0.3);
   }
 }
