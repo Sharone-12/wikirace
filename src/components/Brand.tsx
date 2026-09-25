@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 /** WikiRace mark: a cursor arrow in a solid ink disc, the click that moves you on. */
 export function Logo({ size = 30 }: { size?: number }) {
@@ -36,6 +37,7 @@ export function NavLinks() {
       <a href="https://en.wikipedia.org" target="_blank" rel="noreferrer" className="nav-link hidden sm:inline">
         Wikipedia ↗
       </a>
+      <ThemeToggle />
     </nav>
   );
 }

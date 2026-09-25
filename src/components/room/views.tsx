@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { createContext, use, useState } from "react";
 import { TopBar } from "@/components/Brand";
 import { RouteMap } from "@/components/RouteLine";
 import {
@@ -12,7 +12,9 @@ import {
   STATUS_TEXT,
   StatusTag,
 } from "@/components/room/progress";
+import { ImagesSwitch, ThemeSwitch } from "@/components/ThemeToggle";
 import type { RoomState, RunView } from "@/lib/room-types";
+import type { Theme } from "@/lib/theme";
 
 function Notice({ text }: { text: string | null }) {
   if (!text) return null;
@@ -27,13 +29,54 @@ function hostName(state: RoomState) {
   return state.players.find((p) => p.id === state.room.hostId)?.name ?? "the host";
 }
 
+export type RoomSettings = { theme?: Theme; images?: boolean };
+
+/** The room's settings: only the host can change them, and they change for everyone. */
+export const RoomSettingsContext = createContext<{
+  theme: Theme;
+  images: boolean;
+  canChange: boolean;
+  onChange: (patch: RoomSettings) => void;
+} | null>(null);
+
 /** Page frame shared by the room screens: brand on the left, room code on the right. */
-export function RoomShell({ code, children }: { code: string; children: React.ReactNode }) {
+export function RoomShell({
+  code,
+  className = "",
+  children,
+}: {
+  code: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const settings = use(RoomSettingsContext);
+  const hint = settings?.canChange ? "Changes it for everyone in the room" : "The host picks this";
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-5 py-6 sm:px-8">
+    <main className={`mx-auto w-full max-w-3xl flex-1 px-5 py-6 sm:px-8 ${className}`}>
       <TopBar
         tagline="multiplayer race"
-        right={<span className="kicker frame bg-ink px-3 py-1.5 tracking-[0.2em] text-white">Room {code}</span>}
+        right={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {settings && (
+              <>
+                <ImagesSwitch
+                  value={settings.images}
+                  onChange={(images) => settings.onChange({ images })}
+                  disabled={!settings.canChange}
+                  title={hint}
+                />
+                <ThemeSwitch
+                  value={settings.theme}
+                  onChange={(theme) => settings.onChange({ theme })}
+                  disabled={!settings.canChange}
+                  label="Room theme"
+                  title={hint}
+                />
+              </>
+            )}
+            <span className="kicker frame bg-ink px-3 py-1.5 tracking-[0.2em] text-white">Room {code}</span>
+          </div>
+        }
       />
       {children}
     </main>
@@ -131,27 +174,31 @@ export function Waiting({ state, now }: { state: RoomState; now: number }) {
   const closing = round.status === "closing";
   const left = Math.max(0, Math.ceil((round.startsAt + round.timeLimit * 1000 - now) / 1000));
 
+  let outcome: "won" | "lost" | undefined;
   let headline = "You're watching this round.";
   let sub = "You joined mid-race. You'll play the next round.";
   if (mine?.status === "finished") {
+    outcome = "won";
     headline = "You made it.";
     sub = `${round.target} in ${mine.clicks} click${mine.clicks === 1 ? "" : "s"}${
       mine.elapsedMs != null ? ` and ${(mine.elapsedMs / 1000).toFixed(1)} seconds` : ""
     }.${mine.score != null ? ` ${mine.score} points.` : ""}`;
   } else if (mine?.status === "gave_up") {
+    outcome = "lost";
     headline = "Stopped short.";
     sub = "You'll be scored on how close you got when the round ends.";
   } else if (mine) {
+    outcome = "lost";
     headline = "Out of time.";
     sub = "You'll be scored on how close you got.";
   }
 
   return (
-    <RoomShell code={state.room.code}>
+    <RoomShell code={state.room.code} className="results">
       <p className="kicker mt-10 text-muted">
         Round {round.number} of {state.room.roundsTotal} · {round.start} → {round.target}
       </p>
-      <h1 className="display mt-2 text-5xl sm:text-6xl" aria-live="polite">
+      <h1 className="display mt-2 text-5xl sm:text-6xl" aria-live="polite" data-outcome={outcome}>
         {headline}
       </h1>
       <p className="mt-4 text-lg text-muted">{sub}</p>
@@ -212,7 +259,7 @@ export function Results({ state, busy, notice, onNext, onRematch }: ResultsProps
   const iWon = leader?.id === state.me;
 
   return (
-    <RoomShell code={state.room.code}>
+    <RoomShell code={state.room.code} className="results">
       <p className="kicker mt-10 text-muted">
         Round {round.number} of {state.room.roundsTotal} · {round.start} → {round.target}
       </p>

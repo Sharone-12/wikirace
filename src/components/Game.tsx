@@ -268,12 +268,14 @@ export default function Game() {
 
     const headline = won ? `${name} made it.` : outcome === "gave-up" ? "Stopped short." : "Out of time.";
     return (
-      <main className="mx-auto w-full max-w-3xl flex-1 px-5 py-6 sm:px-8">
+      <main className="results mx-auto w-full max-w-3xl flex-1 px-5 py-6 sm:px-8">
         <TopBar />
         <p className="kicker mt-10 text-muted">
           Solo race · {path[0]} → {target}
         </p>
-        <h1 className="display mt-2 text-5xl sm:text-6xl">{headline}</h1>
+        <h1 className="display mt-2 text-5xl sm:text-6xl" data-outcome={won ? "won" : "lost"}>
+          {headline}
+        </h1>
         <p className="mt-4 text-lg text-muted">
           {won
             ? `${target} in ${clicks} click${clicks === 1 ? "" : "s"} and ${elapsed.toFixed(1)} seconds.`

@@ -254,6 +254,14 @@ body:has(.landing) {
   animation: click-ripple 0.5s ease-out forwards;
 }
 
+/* Rooms where the host turned images off: articles are text only. */
+[data-images="off"] .wiki-content :is(img, picture, video, audio, figure, [typeof^="mw:File"], .gallery, .thumb, .infobox-image) {
+  display: none !important;
+}
+[data-images="off"] .wiki-content tr:has(> .infobox-image) {
+  display: none;
+}
+
 /* Time bar when it's nearly out: hatched instead of solid, since there's no red. */
 .bar-low {
   background: repeating-linear-gradient(
@@ -408,4 +416,393 @@ body:has(.landing) {
   .wiki-content .infobox {
     max-height: 14rem;
   }
+}
+
+/* ======================================================================
+   Code theme: a dark code-editor look (charcoal panels, hairline borders,
+   rounded corners, monospace numbers, orange and green accents). It only
+   applies under <html data-theme="code">; everything above is the paper
+   theme and stays as it is. Rules here are unlayered on purpose, so they
+   win over the paper utilities without touching them.
+   ====================================================================== */
+html[data-theme="code"] {
+  color-scheme: dark;
+  --page: #0f0f0f;
+  --bg: #1a1a1a;
+  --surface: #282828;
+  --raised: #333333;
+  --ink: #eff1f6;
+  --muted: #9a9a9a;
+  --line: #3e3e3e;
+  --hair: rgba(255, 255, 255, 0.08);
+  --link: #4ea1ff;
+  --accent: #ffa116;
+
+  --signal: var(--accent);
+  --signal-ink: var(--bg);
+  --sun: var(--surface);
+  --sun-ink: var(--ink);
+  --go: #2cbb5d;
+  --stop: #ef4743;
+  --orange: #ffa116;
+  --purple: #c586c0;
+
+  /* Sans for text, mono for labels and numbers. */
+  --font-display: var(--font-ui), system-ui, sans-serif;
+  --font-serif: var(--font-ui), system-ui, sans-serif;
+  --font-condensed: var(--font-mono-code), ui-monospace, monospace;
+  --font-script: var(--font-mono-code), ui-monospace, monospace;
+}
+
+/* The window: one rounded editor pane instead of the heavy ink frame. */
+[data-theme="code"] .site {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: clip;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+[data-theme="code"] .site > footer {
+  background: var(--surface);
+}
+
+[data-theme="code"] :focus-visible {
+  outline-color: var(--link);
+}
+[data-theme="code"] ::selection {
+  background: rgba(78, 161, 255, 0.35);
+  color: inherit;
+}
+[data-theme="code"] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* Surfaces: hairline borders and rounded corners. */
+[data-theme="code"] .frame {
+  border-width: 1px;
+}
+[data-theme="code"] .frame:not(.rounded-full) {
+  border-radius: 8px;
+}
+[data-theme="code"] .border-ink {
+  border-color: var(--line);
+}
+[data-theme="code"] :is(.border-b-2, .border-b-\[3px\]) {
+  border-bottom-width: 1px;
+}
+[data-theme="code"] :is(.border-t-2, .border-t-\[3px\]) {
+  border-top-width: 1px;
+}
+[data-theme="code"] .border-l-\[3px\] {
+  border-left-width: 2px;
+}
+
+/* Ink fills (route dots, markers) become the orange accent; ink blocks with
+   white type become plain grey fills, like the editor's pills and tabs. */
+[data-theme="code"] .bg-ink {
+  background-color: var(--accent);
+}
+[data-theme="code"] .bg-ink.text-white {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: transparent;
+  color: var(--ink);
+}
+[data-theme="code"] .bg-stop {
+  background-color: rgba(239, 71, 67, 0.12);
+  border-color: rgba(239, 71, 67, 0.35);
+  color: var(--stop);
+}
+[data-theme="code"] .bar-low {
+  background: var(--stop);
+}
+
+/* Type: sentence case sans headings, monospace labels. */
+[data-theme="code"] .display {
+  font-family: var(--font-ui), system-ui, sans-serif;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+}
+[data-theme="code"] .kicker {
+  font-family: var(--font-mono-code), ui-monospace, monospace;
+  font-weight: 400;
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+/* Captions read like code comments. */
+[data-theme="code"] p.kicker.text-muted::before {
+  content: "// ";
+  opacity: 0.6;
+}
+[data-theme="code"] .nav-link {
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+  transition: color 0.15s ease;
+  &:hover {
+    color: var(--ink);
+    text-decoration-line: none;
+  }
+}
+
+/* Wordmark: monospace with a blinking caret, mark in orange. */
+[data-theme="code"] .font-script {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+[data-theme="code"] .font-script::after {
+  content: "_";
+  color: var(--accent);
+  animation: caret-blink 1.1s steps(1) infinite;
+}
+[data-theme="code"] a[aria-label="WikiRace home"] svg {
+  color: var(--accent);
+}
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Buttons: green "Submit" for the main action, grey fills for the rest. */
+[data-theme="code"] .btn-ink {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--go);
+  color: #fff;
+  font-family: var(--font-ui), system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  transition: filter 0.15s ease, opacity 0.15s ease;
+  &:hover:not(:disabled) {
+    transform: none;
+    box-shadow: none;
+    filter: brightness(1.12);
+  }
+}
+[data-theme="code"] .btn-line {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink);
+  font-family: var(--font-ui), system-ui, sans-serif;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.16);
+    color: var(--ink);
+  }
+}
+[data-theme="code"] .lift:hover {
+  transform: none;
+  box-shadow: none;
+  filter: brightness(1.12);
+}
+
+/* Inputs: filled, borderless until focused. */
+[data-theme="code"] :is(.field, select.frame) {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  &:focus {
+    box-shadow: none;
+    border-color: var(--link);
+  }
+}
+
+/* Theme switch: a small pill toggle. */
+[data-theme="code"] .seg-switch {
+  padding: 2px;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.07);
+  border-color: transparent;
+}
+[data-theme="code"] .seg-switch > button {
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+
+/* The article sits in a "Description" panel. */
+[data-theme="code"] main[aria-busy] {
+  margin-top: 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+[data-theme="code"] .wiki-content {
+  font-family: var(--font-ui), system-ui, sans-serif;
+  font-size: 0.975rem;
+  line-height: 1.7;
+  color: rgba(239, 241, 246, 0.86);
+}
+[data-theme="code"] .wiki-content a[data-title] {
+  color: var(--link);
+  font-weight: 500;
+  text-decoration-color: rgba(78, 161, 255, 0.35);
+  text-decoration-thickness: 1px;
+  border-radius: 3px;
+}
+[data-theme="code"] .wiki-content a[data-title]:hover {
+  background: rgba(78, 161, 255, 0.14);
+  color: var(--link);
+  text-decoration-color: var(--link);
+}
+[data-theme="code"] .wiki-content :is(h2, .mw-heading2, h3) {
+  font-family: var(--font-ui), system-ui, sans-serif;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+[data-theme="code"] .wiki-content :is(h2, .mw-heading2) {
+  font-size: 1.35rem;
+  border-bottom: 1px solid var(--line);
+}
+[data-theme="code"] .wiki-content img {
+  filter: none;
+  border-radius: 6px;
+}
+[data-theme="code"] .wiki-content .infobox,
+[data-theme="code"] .wiki-content .wikitable {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--raised);
+}
+/* Wikipedia's inline colours are chosen for white pages; flatten them. */
+[data-theme="code"] .wiki-content [style*="background"] {
+  background: transparent !important;
+}
+[data-theme="code"] .wiki-content [style*="color"] {
+  color: inherit !important;
+}
+
+/* In-race header: a slim toolbar, like the editor's top bar. */
+[data-theme="code"] .race-header {
+  background: var(--surface);
+}
+[data-theme="code"] .race-header [role="progressbar"] {
+  height: 2px;
+  border: 0;
+  background: transparent;
+}
+[data-theme="code"] .race-header [role="progressbar"] > .bg-ink {
+  background: rgba(255, 255, 255, 0.28);
+}
+[data-theme="code"] .race-header [role="progressbar"] > .bar-low {
+  background: var(--stop);
+}
+[data-theme="code"] .race-header button[aria-expanded] {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.35rem 0.75rem;
+}
+[data-theme="code"] .race-header button[aria-expanded] > .kicker {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+[data-theme="code"] .race-header button[aria-expanded] > .display {
+  min-width: 0;
+  font-size: 15px;
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+[data-theme="code"] .race-header .font-condensed {
+  font-size: 18px;
+  font-weight: 500;
+}
+[data-theme="code"] .race-header .font-condensed.bg-ink {
+  background: none;
+  padding: 0;
+  color: var(--stop);
+}
+[data-theme="code"] .race-header .kicker.mt-1 {
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+/* Results screens: compact like a submission page. Small coloured verdict,
+   tight stat cards with medium-weight numbers, quiet section titles. */
+[data-theme="code"] .results h1.display {
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+[data-theme="code"] .results h1[data-outcome="won"] {
+  color: var(--go);
+}
+[data-theme="code"] .results h1[data-outcome="lost"] {
+  color: var(--stop);
+}
+[data-theme="code"] .results p.kicker.mt-10 {
+  margin-top: 2rem;
+}
+[data-theme="code"] .results h1 + p.text-lg {
+  margin-top: 0.4rem;
+  font-size: 13px;
+}
+[data-theme="code"] .results :is(.text-5xl, .text-3xl, .text-\[46px\]):not(h1) {
+  font-size: 22px;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+[data-theme="code"] .results .font-black {
+  font-weight: 600;
+}
+[data-theme="code"] .results .tracking-tighter {
+  letter-spacing: 0;
+}
+[data-theme="code"] .results .text-5xl > .text-2xl {
+  margin-left: 2px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+/* Stat cards */
+[data-theme="code"] .results .min-h-28 {
+  min-height: 0;
+  gap: 0.35rem;
+  padding: 0.75rem 1rem;
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.04);
+}
+[data-theme="code"] .results .min-h-28.bg-ink {
+  background: rgba(255, 255, 255, 0.09);
+}
+[data-theme="code"] .results .min-h-28 > .text-xs {
+  font-weight: 400;
+  color: var(--muted);
+  opacity: 1;
+}
+/* Section titles, winner banner and result rows */
+[data-theme="code"] .results h2.display {
+  font-size: 13px;
+  font-weight: 500;
+}
+[data-theme="code"] .results section > div:first-child.border-b-2 {
+  padding-top: 0.6rem;
+  padding-bottom: 0.6rem;
+}
+[data-theme="code"] .results .display.text-5xl,
+[data-theme="code"] .results .display.text-xl {
+  font-size: 15px;
+  line-height: 1.4;
+}
+[data-theme="code"] .results .size-9 {
+  width: 1.75rem;
+  height: 1.75rem;
+  font-size: 12px;
+}
+[data-theme="code"] .results .text-lg.font-black {
+  font-size: 14px;
+}
+[data-theme="code"] .results :is(.btn-ink, .btn-line) {
+  padding: 0.45rem 1rem;
+  font-size: 14px;
 }

@@ -6,5 +6,10 @@ export const POST = route(async (req) => {
   const body = await readBody(req);
   const authed = await authPlayer(req);
   const player = body.name === undefined ? authed : await renamePlayer(authed, body.name);
-  return createRoom(player, { roundsTotal: body.roundsTotal, timeLimit: body.timeLimit });
+  return createRoom(player, {
+    roundsTotal: body.roundsTotal,
+    timeLimit: body.timeLimit,
+    theme: body.theme,
+    images: body.images,
+  });
 });

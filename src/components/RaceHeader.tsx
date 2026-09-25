@@ -34,7 +34,7 @@ export function RaceHeader(p: RaceHeaderProps) {
   const low = p.timeLeft <= 30;
 
   return (
-    <header className="sticky top-0 z-10 border-b-[3px] border-ink bg-bg">
+    <header className="race-header sticky top-0 z-10 border-b-[3px] border-ink bg-bg">
       <div
         className="h-2 border-b-2 border-ink bg-bg"
         role="progressbar"

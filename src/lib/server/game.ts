@@ -5,6 +5,7 @@ import type { Player } from "@/lib/server/players";
 import { broadcast } from "@/lib/server/realtime";
 import { serverWiki } from "@/lib/server/wiki";
 import { pickRoute } from "@/lib/targets";
+import { DEFAULT_THEME, isTheme, type Theme } from "@/lib/theme";
 import { apiHasLink, canonicalTitle, fetchExtract, normTitle } from "@/lib/wiki-core";
 import {
   measureCloseness,
@@ -38,6 +39,8 @@ interface RoomRow {
   status: RoomStatus;
   rounds_total: number;
   time_limit: number;
+  theme: Theme;
+  show_images: boolean;
   created_at: string;
 }
 interface RoundRow {
@@ -66,7 +69,12 @@ interface RunRow {
   closeness: Closeness | null;
 }
 
-const ROOM_COLS = "id, code, host_id, status, rounds_total, time_limit, created_at";
+const BASE_ROOM_COLS = "id, code, host_id, status, rounds_total, time_limit, created_at";
+const ROOM_COLS = `${BASE_ROOM_COLS}, theme, show_images`;
+// Migrations 0002 and 0003 add rooms.theme and rooms.show_images. Until they
+// have run, rooms are read and written without them and use the defaults.
+const MISSING_COLUMN = new Set(["42703", "PGRST204"]);
+const missingColumn = (err: { code?: string } | null) => !!err && MISSING_COLUMN.has(err.code ?? "");
 const ROUND_COLS =
   "id, room_id, number, start_title, target_title, target_extract, time_limit, starts_at, status, closing_at";
 const RUN_COLS =
@@ -79,11 +87,18 @@ function normCode(code: string): string {
 }
 
 async function loadRoom(code: string): Promise<RoomRow> {
-  const room = must(
-    await db().from("rooms").select(ROOM_COLS).eq("code", normCode(code)).maybeSingle(),
-  ) as RoomRow | null;
+  const c = normCode(code);
+  const first = await db().from("rooms").select(ROOM_COLS).eq("code", c).maybeSingle();
+  const res = missingColumn(first.error)
+    ? await db().from("rooms").select(BASE_ROOM_COLS).eq("code", c).maybeSingle()
+    : first;
+  const room = must(res) as RoomRow | null;
   if (!room) throw new HttpError(404, "That room code doesn't exist.");
-  return room;
+  return {
+    ...room,
+    theme: isTheme(room.theme) ? room.theme : DEFAULT_THEME,
+    show_images: room.show_images ?? true,
+  };
 }
 
 async function isMember(roomId: string, playerId: string): Promise<boolean> {
@@ -145,20 +160,21 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
 
 export async function createRoom(
   player: Player,
-  opts: { roundsTotal?: unknown; timeLimit?: unknown },
+  opts: { roundsTotal?: unknown; timeLimit?: unknown; theme?: unknown; images?: unknown },
 ): Promise<{ code: string }> {
   const roundsTotal = Math.min(10, Math.max(1, Math.round(Number(opts.roundsTotal) || 5)));
   const timeLimit = Math.min(600, Math.max(60, Math.round(Number(opts.timeLimit) || 180)));
+  const theme = isTheme(opts.theme) ? opts.theme : DEFAULT_THEME;
+  const showImages = opts.images !== false;
   for (let attempt = 0; attempt < 8; attempt++) {
     const code = Array.from(
       { length: 4 },
       () => CODE_LETTERS[Math.floor(Math.random() * CODE_LETTERS.length)],
     ).join("");
-    const res = await db()
-      .from("rooms")
-      .insert({ code, host_id: player.id, rounds_total: roundsTotal, time_limit: timeLimit })
-      .select("id")
-      .single();
+    const row = { code, host_id: player.id, rounds_total: roundsTotal, time_limit: timeLimit };
+    const insert = (values: object) => db().from("rooms").insert(values).select("id").single();
+    const first = await insert({ ...row, theme, show_images: showImages });
+    const res = missingColumn(first.error) ? await insert(row) : first;
     if (res.error?.code === "23505") continue; // code taken, try another
     const room = must(res) as { id: string };
     must(await db().from("room_players").insert({ room_id: room.id, player_id: player.id }));
@@ -174,6 +190,33 @@ export async function joinRoom(player: Player, code: string): Promise<void> {
     if (res.error && res.error.code !== "23505") must(res);
   }
   // Also covers a rejoin with a changed name.
+  after(() => broadcast(room.code, { event: "refresh", payload: {} }));
+}
+
+/** The host picks the room's look and whether articles show images; it
+ *  changes for everyone in the room. */
+export async function updateSettings(
+  player: Player,
+  code: string,
+  body: { theme?: unknown; images?: unknown },
+): Promise<void> {
+  const patch: { theme?: Theme; show_images?: boolean } = {};
+  if (body.theme !== undefined) {
+    if (!isTheme(body.theme)) throw new HttpError(400, "Unknown theme.");
+    patch.theme = body.theme;
+  }
+  if (body.images !== undefined) {
+    if (typeof body.images !== "boolean") throw new HttpError(400, "Bad images setting.");
+    patch.show_images = body.images;
+  }
+  if (!Object.keys(patch).length) throw new HttpError(400, "Nothing to change.");
+  const room = await loadRoom(code);
+  if (room.host_id !== player.id) throw new HttpError(403, "Only the host can change room settings.");
+  const res = await db().from("rooms").update(patch).eq("id", room.id);
+  if (missingColumn(res.error)) {
+    throw new HttpError(503, "Room settings need a database update first (npm run db:migrate).");
+  }
+  must(res);
   after(() => broadcast(room.code, { event: "refresh", payload: {} }));
 }
 
@@ -246,6 +289,8 @@ export async function getState(player: Player, code: string): Promise<RoomState>
       hostId: room.host_id,
       roundsTotal: room.rounds_total,
       timeLimit: room.time_limit,
+      theme: room.theme,
+      images: room.show_images,
       nextCode,
     },
     players: memberRows.map((m) => ({
@@ -599,6 +644,8 @@ export async function rematch(player: Player, code: string): Promise<{ code: str
   const next = await createRoom(player, {
     roundsTotal: room.rounds_total,
     timeLimit: room.time_limit,
+    theme: room.theme,
+    images: room.show_images,
   });
   const nextRoom = await loadRoom(next.code);
   const others = members.filter((m) => m.player_id !== player.id);

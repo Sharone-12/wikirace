@@ -6,10 +6,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { newerRun } from "@/components/room/progress";
 import { Race } from "@/components/room/Race";
 import { Logo } from "@/components/Brand";
-import { Lobby, Results, RoomShell, Waiting } from "@/components/room/views";
+import {
+  Lobby,
+  Results,
+  RoomSettingsContext,
+  RoomShell,
+  Waiting,
+  type RoomSettings,
+} from "@/components/room/views";
 import { ApiError, apiCall } from "@/lib/client/api";
 import { ensureIdentity, loadIdentity, type Identity } from "@/lib/client/identity";
 import { realtime } from "@/lib/client/realtime";
+import { applyTheme, loadTheme } from "@/lib/client/theme";
 import type { RoomState, RunStatus, RunView } from "@/lib/room-types";
 
 const CLOSE_AFTER_MS = 2500; // past the time limit, so the server's grace has passed
@@ -196,6 +204,39 @@ export default function Room({ code: rawCode }: { code: string }) {
     return () => clearTimeout(timer);
   }, [code, roundId, roundStatus, endsAt, apply]);
 
+  // The room's settings (the host's picks) apply while you're here: its
+  // theme replaces your own, and articles may be shown without images.
+  const roomTheme = state?.room.theme;
+  const roomImages = state?.room.images;
+  useEffect(() => {
+    if (roomTheme) applyTheme(roomTheme);
+  }, [roomTheme]);
+  useEffect(() => {
+    if (roomImages === false) document.documentElement.dataset.images = "off";
+    else delete document.documentElement.dataset.images;
+  }, [roomImages]);
+  useEffect(
+    () => () => {
+      applyTheme(loadTheme());
+      delete document.documentElement.dataset.images;
+    },
+    [],
+  );
+
+  const changeSettings = useCallback(
+    async (patch: RoomSettings) => {
+      setNotice(null);
+      setState((prev) => prev && { ...prev, room: { ...prev.room, ...patch } });
+      try {
+        apply(await apiCall<RoomState>(`/api/rooms/${code}/settings`, patch));
+      } catch (e) {
+        setNotice(message(e));
+        refresh();
+      }
+    },
+    [code, apply, refresh],
+  );
+
   const onRun = useCallback((run: RunView) => {
     setState(
       (prev) =>
@@ -252,8 +293,10 @@ export default function Room({ code: rawCode }: { code: string }) {
   }
 
   const round = state.round;
+  const mine = state.runs.find((r) => r.playerId === state.me);
+  let screen: React.ReactNode;
   if (!round) {
-    return (
+    screen = (
       <Lobby
         state={state}
         online={online}
@@ -262,9 +305,8 @@ export default function Room({ code: rawCode }: { code: string }) {
         onStart={() => hostAction("start")}
       />
     );
-  }
-  if (round.status === "closed") {
-    return (
+  } else if (round.status === "closed") {
+    screen = (
       <Results
         state={state}
         busy={busy}
@@ -273,12 +315,23 @@ export default function Room({ code: rawCode }: { code: string }) {
         onRematch={() => hostAction("rematch")}
       />
     );
+  } else if (mine && mine.status === "playing" && round.status === "playing") {
+    screen = <Race key={round.id} state={state} run={mine} now={now} onRun={onRun} onStale={refresh} />;
+  } else {
+    screen = <Waiting state={state} now={now} />;
   }
-  const mine = state.runs.find((r) => r.playerId === state.me);
-  if (mine && mine.status === "playing" && round.status === "playing") {
-    return <Race key={round.id} state={state} run={mine} now={now} onRun={onRun} onStale={refresh} />;
-  }
-  return <Waiting state={state} now={now} />;
+  return (
+    <RoomSettingsContext
+      value={{
+        theme: state.room.theme,
+        images: state.room.images,
+        canChange: state.me === state.room.hostId,
+        onChange: changeSettings,
+      }}
+    >
+      {screen}
+    </RoomSettingsContext>
+  );
 }
 
 function NameGate({ code, onReady }: { code: string; onReady: (id: Identity) => Promise<void> }) {

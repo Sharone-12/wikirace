@@ -3,8 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { TopBar } from "@/components/Brand";
+import { ImagesSwitch, ThemeSwitch } from "@/components/ThemeToggle";
 import { apiCall } from "@/lib/client/api";
 import { ensureIdentity, loadIdentity } from "@/lib/client/identity";
+import { loadTheme } from "@/lib/client/theme";
+import { DEFAULT_THEME, type Theme } from "@/lib/theme";
 
 const select =
   "frame w-full appearance-none bg-bg px-4 py-2.5 font-bold outline-none focus:shadow-[4px_4px_0_var(--ink)]";
@@ -23,15 +26,19 @@ export default function Entry() {
   const [name, setName] = useState("");
   const [rounds, setRounds] = useState(3);
   const [minutes, setMinutes] = useState(3);
+  const [theme, setTheme] = useState<Theme>(DEFAULT_THEME);
+  const [images, setImages] = useState(true);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Prefill the name this browser played under last time.
+  // Prefill the name this browser played under last time, and offer its theme.
   useEffect(() => {
     const saved = loadIdentity()?.name;
-    if (!saved) return;
-    const t = setTimeout(() => setName((n) => n || saved), 0);
+    const t = setTimeout(() => {
+      if (saved) setName((n) => n || saved);
+      setTheme(loadTheme());
+    }, 0);
     return () => clearTimeout(t);
   }, []);
 
@@ -48,6 +55,8 @@ export default function Entry() {
         name: identity.name,
         roundsTotal: rounds,
         timeLimit: minutes * 60,
+        theme,
+        images,
       });
       router.push(`/room/${room.code}`);
     } catch (err) {
@@ -127,6 +136,16 @@ export default function Entry() {
                 <Chevron />
               </span>
             </label>
+          </div>
+          <div className="flex flex-wrap gap-x-5 gap-y-3">
+            <div className="flex flex-col items-start gap-1.5">
+              <span className="kicker">Room theme</span>
+              <ThemeSwitch value={theme} onChange={setTheme} disabled={busy} label="Room theme" />
+            </div>
+            <div className="flex flex-col items-start gap-1.5">
+              <span className="kicker">Article images</span>
+              <ImagesSwitch value={images} onChange={setImages} disabled={busy} />
+            </div>
           </div>
           <button type="submit" disabled={!name.trim() || busy} className="btn-ink mt-auto">
             Create room →

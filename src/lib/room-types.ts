@@ -1,5 +1,6 @@
 // Shapes shared by the multiplayer API routes and the room UI.
 import type { Closeness, ScoreBreakdown } from "@/lib/scoring";
+import type { Theme } from "@/lib/theme";
 
 export type RoomStatus = "lobby" | "playing" | "finished";
 export type RoundStatus = "playing" | "closing" | "closed";
@@ -35,6 +36,8 @@ export interface RoomState {
     hostId: string;
     roundsTotal: number;
     timeLimit: number; // seconds
+    theme: Theme; // chosen by the host, shown to everyone in the room
+    images: boolean; // whether articles show their images, also the host's call
     nextCode: string | null; // after a rematch: the room everyone moved to
   };
   players: { id: string; name: string; total: number }[];

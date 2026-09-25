@@ -1,5 +1,14 @@
 import { HttpError } from "@/lib/server/db";
-import { getState, giveUp, joinRoom, move, rematch, startRound, tryClose } from "@/lib/server/game";
+import {
+  getState,
+  giveUp,
+  joinRoom,
+  move,
+  rematch,
+  startRound,
+  tryClose,
+  updateSettings,
+} from "@/lib/server/game";
 import { readBody, route } from "@/lib/server/http";
 import { authPlayer, renamePlayer } from "@/lib/server/players";
 
@@ -29,6 +38,9 @@ export const POST = route(async (req, ctx: RouteContext<"/api/rooms/[code]/[acti
       return getState(player, code);
     case "rematch":
       return rematch(player, code);
+    case "settings":
+      await updateSettings(player, code, body);
+      return getState(player, code);
     default:
       throw new HttpError(404, "Unknown action.");
   }
