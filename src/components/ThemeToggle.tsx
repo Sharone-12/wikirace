@@ -13,7 +13,7 @@ interface SegmentedProps<T> {
   title?: string;
 }
 
-/** Small segmented switch, e.g. Paper | Code or On | Off. */
+/** Small segmented switch, e.g. Light | Dark or Images | No images. */
 export function Segmented<T extends string | boolean>({
   options,
   value,
@@ -48,7 +48,7 @@ export function Segmented<T extends string | boolean>({
 
 const THEME_OPTIONS = THEMES.map((t) => ({ value: t, label: THEME_LABEL[t] }));
 
-/** Paper | Code. */
+/** Light | Dark. */
 export function ThemeSwitch(props: Omit<SegmentedProps<Theme>, "options" | "label"> & { label?: string }) {
   return <Segmented options={THEME_OPTIONS} label="Theme" {...props} />;
 }

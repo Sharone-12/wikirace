@@ -194,14 +194,14 @@ export async function joinRoom(player: Player, code: string): Promise<void> {
   after(() => broadcast(room.code, { event: "refresh", payload: {} }));
 }
 
-/** The host picks the room's look and whether articles show images; it
- *  changes for everyone in the room. */
+/** The host picks the room's look, whether articles show images, and (until
+ *  the game starts) the rounds and minutes; it changes for everyone. */
 export async function updateSettings(
   player: Player,
   code: string,
-  body: { theme?: unknown; images?: unknown },
+  body: { theme?: unknown; images?: unknown; roundsTotal?: unknown; timeLimit?: unknown },
 ): Promise<void> {
-  const patch: { theme?: Theme; show_images?: boolean } = {};
+  const patch: { theme?: Theme; show_images?: boolean; rounds_total?: number; time_limit?: number } = {};
   if (body.theme !== undefined) {
     if (!isTheme(body.theme)) throw new HttpError(400, "Unknown theme.");
     patch.theme = body.theme;
@@ -210,9 +210,22 @@ export async function updateSettings(
     if (typeof body.images !== "boolean") throw new HttpError(400, "Bad images setting.");
     patch.show_images = body.images;
   }
+  if (body.roundsTotal !== undefined) {
+    const n = Number(body.roundsTotal);
+    if (!Number.isInteger(n) || n < 1 || n > 10) throw new HttpError(400, "Rounds must be 1 to 10.");
+    patch.rounds_total = n;
+  }
+  if (body.timeLimit !== undefined) {
+    const n = Number(body.timeLimit);
+    if (!Number.isInteger(n) || n < 60 || n > 600) throw new HttpError(400, "Time must be 1 to 10 minutes.");
+    patch.time_limit = n;
+  }
   if (!Object.keys(patch).length) throw new HttpError(400, "Nothing to change.");
   const room = await loadRoom(code);
   if (room.host_id !== player.id) throw new HttpError(403, "Only the host can change room settings.");
+  if ((patch.rounds_total !== undefined || patch.time_limit !== undefined) && room.status !== "lobby") {
+    throw new HttpError(409, "Rounds and time can't change once the game has started.");
+  }
   const res = await db().from("rooms").update(patch).eq("id", room.id);
   if (missingColumn(res.error)) {
     throw new HttpError(503, "Room settings need a database update first (npm run db:migrate).");

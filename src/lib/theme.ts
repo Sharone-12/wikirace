@@ -8,8 +8,8 @@ export type Theme = (typeof THEMES)[number];
 export const DEFAULT_THEME: Theme = "paper";
 
 export const THEME_LABEL: Record<Theme, string> = {
-  paper: "Paper",
-  code: "Code",
+  paper: "Light",
+  code: "Dark",
 };
 
 export function isTheme(v: unknown): v is Theme {

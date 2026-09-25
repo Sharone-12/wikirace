@@ -180,7 +180,7 @@ export function Chat({ messages, total, onSend }: ChatProps) {
           <Unfindable text={`${opacity}%`} className="w-8 text-right tabular-nums" />
         </label>
       )}
-      <ul aria-live="polite" className="max-h-40 space-y-1 overflow-y-auto px-3 py-2 text-sm leading-snug">
+      <ul aria-live="polite" className="max-h-52 space-y-1 overflow-y-auto px-3 py-2 text-sm leading-snug">
         {messages.length === 0 ? (
           <li className="text-muted">
             <Unfindable text="No messages yet." />

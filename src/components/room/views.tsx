@@ -29,7 +29,7 @@ function hostName(state: RoomState) {
   return state.players.find((p) => p.id === state.room.hostId)?.name ?? "the host";
 }
 
-export type RoomSettings = { theme?: Theme; images?: boolean };
+export type RoomSettings = { theme?: Theme; images?: boolean; roundsTotal?: number; timeLimit?: number };
 
 /** The room's settings: only the host can change them, and they change for everyone. */
 export const RoomSettingsContext = createContext<{
@@ -83,12 +83,47 @@ export function RoomShell({
   );
 }
 
-/** Big number block. */
-function Stat({ k, v, u, color }: { k: string; v: string | number; u: string; color: string }) {
+/** Big number block. With `pick`, the number is a dropdown (for the host in the lobby). */
+function Stat({
+  k,
+  v,
+  u,
+  color,
+  pick,
+}: {
+  k: string;
+  v: number;
+  u: string;
+  color: string;
+  pick?: { options: number[]; onChange: (n: number) => void };
+}) {
+  const number = "font-condensed text-[36px] font-semibold leading-none tabular-nums";
   return (
     <div className={`frame flex min-h-24 flex-col justify-between px-4 pb-3.5 pt-3 ${color}`}>
       <span className="kicker">{k}</span>
-      <span className="font-condensed text-[36px] font-semibold leading-none tabular-nums">{v}</span>
+      {pick ? (
+        <span className="relative flex items-center">
+          <select
+            value={v}
+            onChange={(e) => pick.onChange(Number(e.target.value))}
+            aria-label={k}
+            className={`stat-pick w-full cursor-pointer appearance-none bg-transparent pr-5 outline-none ${number}`}
+          >
+            {[...new Set([...pick.options, v])]
+              .sort((a, b) => a - b)
+              .map((n) => (
+                <option key={n} value={n} className="bg-bg text-base text-ink">
+                  {n}
+                </option>
+              ))}
+          </select>
+          <span aria-hidden="true" className="pointer-events-none absolute right-0 text-xs">
+            ▼
+          </span>
+        </span>
+      ) : (
+        <span className={number}>{v}</span>
+      )}
       <span className="text-[11px] font-semibold opacity-75">{u}</span>
     </div>
   );
@@ -107,6 +142,8 @@ interface LobbyProps {
 export function Lobby({ state, online, busy, notice, onStart }: LobbyProps) {
   const [copied, setCopied] = useState(false);
   const isHost = state.me === state.room.hostId;
+  const settings = use(RoomSettingsContext);
+  const editable = isHost && settings?.canChange;
   const { code, roundsTotal, timeLimit } = state.room;
 
   async function copyLink() {
@@ -140,8 +177,24 @@ export function Lobby({ state, online, busy, notice, onStart }: LobbyProps) {
       </div>
 
       <div className="mt-8 grid grid-cols-3 gap-3">
-        <Stat k="Rounds" v={roundsTotal} u="then a winner" color="bg-ink text-white" />
-        <Stat k="Minutes" v={timeLimit / 60} u="per round" color="bg-surface" />
+        <Stat
+          k="Rounds"
+          v={roundsTotal}
+          u={editable ? "tap to change" : "then a winner"}
+          color="bg-ink text-white"
+          pick={editable ? { options: [1, 3, 5, 10], onChange: (n) => settings.onChange({ roundsTotal: n }) } : undefined}
+        />
+        <Stat
+          k="Minutes"
+          v={timeLimit / 60}
+          u={editable ? "tap to change" : "per round"}
+          color="bg-surface"
+          pick={
+            editable
+              ? { options: [2, 3, 5, 10], onChange: (n) => settings.onChange({ timeLimit: n * 60 }) }
+              : undefined
+          }
+        />
         <Stat k="Players" v={state.players.length} u="in the room" color="bg-surface" />
       </div>
 

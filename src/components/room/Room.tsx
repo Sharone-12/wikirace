@@ -23,7 +23,7 @@ import type { ChatMessage, RoomState, RunStatus, RunView } from "@/lib/room-type
 
 const CLOSE_AFTER_MS = 2500; // past the time limit, so the server's grace has passed
 const CLOSE_RETRY_MS = 5000;
-const CHAT_SHOWN = 3; // chat keeps only the latest few messages
+const CHAT_SHOWN = 5; // chat keeps only the latest few messages
 
 type Phase = "loading" | "need-name" | "ready" | "error";
 
