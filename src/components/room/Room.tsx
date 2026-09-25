@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Chat } from "@/components/room/Chat";
 import { newerRun } from "@/components/room/progress";
 import { Race } from "@/components/room/Race";
 import { Logo } from "@/components/Brand";
@@ -18,10 +19,11 @@ import { ApiError, apiCall } from "@/lib/client/api";
 import { ensureIdentity, loadIdentity, type Identity } from "@/lib/client/identity";
 import { realtime } from "@/lib/client/realtime";
 import { applyTheme, loadTheme } from "@/lib/client/theme";
-import type { RoomState, RunStatus, RunView } from "@/lib/room-types";
+import type { ChatMessage, RoomState, RunStatus, RunView } from "@/lib/room-types";
 
 const CLOSE_AFTER_MS = 2500; // past the time limit, so the server's grace has passed
 const CLOSE_RETRY_MS = 5000;
+const CHAT_SHOWN = 3; // chat keeps only the latest few messages
 
 type Phase = "loading" | "need-name" | "ready" | "error";
 
@@ -69,6 +71,7 @@ export default function Room({ code: rawCode }: { code: string }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [online, setOnline] = useState<Set<string>>(new Set());
+  const [chat, setChat] = useState<{ messages: ChatMessage[]; total: number }>({ messages: [], total: 0 });
   const offset = useRef(0);
   const now = useServerNow(offset);
 
@@ -143,6 +146,21 @@ export default function Room({ code: rawCode }: { code: string }) {
     [refresh],
   );
 
+  // A chat message arrives twice for its sender (API reply and broadcast): keep one.
+  const addChat = useCallback((m: ChatMessage) => {
+    if (typeof m?.id !== "string" || typeof m.text !== "string" || typeof m.name !== "string") return;
+    setChat((prev) =>
+      prev.messages.some((x) => x.id === m.id)
+        ? prev
+        : { messages: [...prev.messages, m].slice(-CHAT_SHOWN), total: prev.total + 1 },
+    );
+  }, []);
+
+  const sendChat = useCallback(
+    async (text: string) => addChat(await apiCall<ChatMessage>(`/api/rooms/${code}/chat`, { text })),
+    [code, addChat],
+  );
+
   // Realtime: broadcast hints from the server, presence for who's online.
   const meId = identity?.id;
   const meName = identity?.name;
@@ -151,6 +169,7 @@ export default function Room({ code: rawCode }: { code: string }) {
     const ch = realtime().channel(`room:${code}`, { config: { presence: { key: meId } } });
     ch.on("broadcast", { event: "refresh" }, () => refresh())
       .on("broadcast", { event: "progress" }, ({ payload }) => onProgress(payload))
+      .on("broadcast", { event: "chat" }, ({ payload }) => addChat(payload))
       .on("broadcast", { event: "rematch" }, ({ payload }) => {
         if (typeof payload?.code === "string") router.push(`/room/${payload.code}`);
       })
@@ -164,7 +183,7 @@ export default function Room({ code: rawCode }: { code: string }) {
     return () => {
       realtime().removeChannel(ch);
     };
-  }, [code, meId, meName, refresh, onProgress, router]);
+  }, [code, meId, meName, refresh, onProgress, addChat, router]);
 
   // Rematch fallback: if the "rematch" broadcast was missed, the next state
   // we fetch names the new room, so nobody is left behind in the old one.
@@ -330,6 +349,7 @@ export default function Room({ code: rawCode }: { code: string }) {
       }}
     >
       {screen}
+      <Chat messages={chat.messages} total={chat.total} onSend={sendChat} />
     </RoomSettingsContext>
   );
 }

@@ -5,6 +5,7 @@ import {
   joinRoom,
   move,
   rematch,
+  sendChat,
   startRound,
   tryClose,
   updateSettings,
@@ -38,6 +39,8 @@ export const POST = route(async (req, ctx: RouteContext<"/api/rooms/[code]/[acti
       return getState(player, code);
     case "rematch":
       return rematch(player, code);
+    case "chat":
+      return sendChat(player, code, body.text);
     case "settings":
       await updateSettings(player, code, body);
       return getState(player, code);

@@ -15,6 +15,7 @@ import {
   type ScoreBreakdown,
 } from "@/lib/scoring";
 import type {
+  ChatMessage,
   PathStep,
   RoomState,
   RoomStatus,
@@ -218,6 +219,22 @@ export async function updateSettings(
   }
   must(res);
   after(() => broadcast(room.code, { event: "refresh", payload: {} }));
+}
+
+/** Room chat: not stored, just relayed to everyone in the room. */
+export async function sendChat(player: Player, code: string, text: unknown): Promise<ChatMessage> {
+  if (typeof text !== "string" || !text.trim()) throw new HttpError(400, "Type a message first.");
+  const room = await loadRoom(code);
+  if (!(await isMember(room.id, player.id))) throw new HttpError(403, "Join the room first.");
+  const msg: ChatMessage = {
+    id: crypto.randomUUID(),
+    playerId: player.id,
+    name: player.name,
+    text,
+    t: Date.now(),
+  };
+  await broadcast(room.code, { event: "chat", payload: msg });
+  return msg;
 }
 
 // ---------------------------------------------------------------- state

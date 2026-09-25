@@ -54,9 +54,18 @@ export interface RoomState {
   runs: RunView[];
 }
 
+export interface ChatMessage {
+  id: string;
+  playerId: string;
+  name: string; // the sender's name, as the server knows it
+  text: string;
+  t: number; // ms epoch, server clock
+}
+
 // Realtime broadcast events on channel `room:{code}`. They are hints only:
 // the API is the source of truth, and clients refetch state on "refresh".
 export type RoomEvent =
   | { event: "refresh"; payload: Record<string, never> }
   | { event: "progress"; payload: { playerId: string; clicks: number; status: RunStatus } }
-  | { event: "rematch"; payload: { code: string } };
+  | { event: "rematch"; payload: { code: string } }
+  | { event: "chat"; payload: ChatMessage };
